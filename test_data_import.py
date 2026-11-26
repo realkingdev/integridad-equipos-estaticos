@@ -5,7 +5,7 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 
-from data_import import read_measurements_csv, read_measurements_sqlite
+from data_import import read_measurements_csv, read_measurements_sqlite, read_sqlite_catalog
 
 
 class DataImportTests(unittest.TestCase):
@@ -17,9 +17,31 @@ class DataImportTests(unittest.TestCase):
         self.assertEqual(rows[0]['espesor'], '5,40')
         self.assertEqual(rows[0]['observaciones'], 'UT; campaña de prueba')
 
+    def test_csv_ignores_delimiters_inside_quoted_headers(self):
+        rows = read_measurements_csv('tag;"zona, lado, acceso";espesor\nL-101;norte;4,4\n')
+        self.assertEqual(rows[0]["zona, lado, acceso"], "norte")
+        self.assertEqual(rows[0]["espesor"], "4,4")
+
     def test_csv_validates_columns(self):
         with self.assertRaisesRegex(ValueError, 'fila 2'):
             read_measurements_csv('tag,tml,fecha,espesor\nV-201,TML-02,2024-06-01')
+
+    def test_csv_rejects_duplicate_columns(self):
+        with self.assertRaisesRegex(ValueError, 'duplicados'):
+            read_measurements_csv('tag,espesor,espesor\nL-101,4.4,5.1')
+
+    def test_sqlite_lists_and_reads_mapped_tables(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory, "origen.sqlite"))
+            with closing(sqlite3.connect(path)) as db:
+                with db:
+                    db.execute('CREATE TABLE "Historial UT" ("Equipo", "Pared")')
+                    db.execute('INSERT INTO "Historial UT" VALUES (?, ?)', ("T-1", 8.5))
+                    db.execute('CREATE VIEW "Informe" AS SELECT * FROM "Historial UT"')
+            self.assertEqual(read_sqlite_catalog(path), ['Historial UT'])
+            self.assertEqual(read_measurements_sqlite(path, 'Historial UT')[0]["Pared"], 8.5)
+            with self.assertRaises(ValueError):
+                read_measurements_sqlite(path, "Informe")
 
     def test_sqlite_reads_only_expected_table(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -36,7 +36,10 @@ function pointForm(i,j){
  for(const k of ['name','id','cml','basis'])p[k]=f.get(k).trim();for(const k of ['x','y','minimum_mm','alert_mm','elevation_m'])if(f.has(k))p[k]=Number(f.get(k));
  if(f.has('geometry'))p.geometry=f.get('geometry');
  if(p.alert_mm<=p.minimum_mm)throw Error('La alerta debe superar el mínimo documentado.');
- commit(pr=>{const pts=pr.equipment[i].points;if(isNew)pts.push(p);else pts[j]=p});
+ commit(pr=>{const pts=pr.equipment[i].points;if(isNew)pts.push(p);else {
+   auditThresholds(pts[j],p.minimum_mm,p.alert_mm,p.basis);
+   pts[j]={...p,thresholdHistory:pts[j].thresholdHistory};
+ }});
  pointIndex=isNew?e.points.length:j;render()
  });
  selectMarkerPosition(photo(e),p)
@@ -65,12 +68,12 @@ function handleAction(act){
 $('restore').onchange=async ev=>{
  const file=ev.target.files[0];ev.target.value='';if(!file)return;
  try{if(file.size>10000000)throw Error('El proyecto supera 10 MB.');const data=JSON.parse(await file.text());evaluateAll(data);
- dialog('Recuperar proyecto','<p class="wide">El archivo contiene '+data.equipment.length+' equipos. Al recuperar el caso se reemplazarán los datos guardados en este navegador.</p>',()=>{commit(pr=>{Object.assign(pr,data)});location.hash='#equipos';notify('Proyecto recuperado')},'Recuperar')
+ dialog('Recuperar proyecto','<p class="wide">El archivo contiene '+data.equipment.length+' equipos. Al recuperar el caso se reemplazarán los datos guardados en este navegador.</p>',()=>{commit(pr=>{Object.assign(pr,data);pr.comparisons=data.comparisons??[]});location.hash='#equipos';notify('Proyecto recuperado')},'Recuperar')
  }catch(err){notify(message(err))}
 };
 document.addEventListener('click',event=>{
  const a=event.target.closest('[data-act],[data-tab],[data-pin],[data-point],[data-status],[data-reading],[data-doc]');if(!a||!project)return;
- if(a.dataset.status){filter='';familyFilter='';statusFilter=a.dataset.status;if(location.hash==='#agenda')render();else location.hash='#agenda';return}
+ if(a.dataset.status){filter='';familyFilter='';scheduleDays=0;scheduleTag='';statusFilter=a.dataset.status;if(location.hash==='#agenda')render();else location.hash='#agenda';return}
  if(a.dataset.reading){const [,,i]=current();return measure(i,pointIndex,a.dataset.reading)}
  if(a.dataset.doc!==undefined)return openDocument(Number(a.dataset.doc));
  if(a.dataset.act){handleAction(a.dataset.act);return}
@@ -78,10 +81,12 @@ document.addEventListener('click',event=>{
  if(a.dataset.pin!==undefined){pointIndex=Number(a.dataset.pin);render();return}
  if(a.dataset.point){const tag=decodeURIComponent(a.hash.slice(8));const e=project.equipment.find(e=>e.tag===tag);if(e){currentId=tag;tab='monitoreo';pointIndex=e.points.findIndex(p=>p.id===a.dataset.point);if(location.hash===a.hash)render()}}
 });
-document.addEventListener('input',ev=>{if(ev.target.id==='filter'){filter=ev.target.value;render();$('filter').focus();$('filter').setSelectionRange(filter.length,filter.length)}});
+document.addEventListener('input',ev=>{if(ev.target.id==='filter'){scheduleTag='';filter=ev.target.value;render();$('filter').focus();$('filter').setSelectionRange(filter.length,filter.length)}});
 document.addEventListener('change',ev=>{if(ev.target.id==='designPoint'){pointIndex=Number(ev.target.value);render();$('designPoint').focus();return}if(ev.target.id==='assessment')return dueDate(ev.target.value);if(ev.target.id==='familyFilter'){familyFilter=ev.target.value;render()}if(ev.target.id==='statusFilter'){statusFilter=ev.target.value;render()}});
 function activateDeepLink(){
- const [name,id,point,view]=route();
+ const routeInfo=route();
+ activateAssistantRoute(routeInfo);
+ const [name,id,point,view]=routeInfo;
  if (name!=='equipo') return;
  const equipment=project.equipment.find(e=>e.tag===id);
  if (!equipment || (!point && !view)) return;
@@ -95,13 +100,13 @@ window.addEventListener('resize',()=>{if(project)drawTrend()});
 async function start(){
  try{
  py=await loadPyodide({indexURL:new URL('runtime/',document.baseURI).href});
- for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v=3');if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
- py.runPython('import json\nfrom engineering import demo_equipment, evaluate\nfrom rbi import rbi as _risk, DEFAULTS\nfrom data_import import read_measurements_csv as _read_csv, read_measurements_sqlite as _read_sqlite\ndef _evaluate(obj): return evaluate(obj, _today)\ndef _simulate(obj): return evaluate(obj[\'equipment\'], max(_today, obj[\'date\']))');
+ for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v=4');if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
+ py.runPython('import json\nfrom engineering import demo_equipment, evaluate\nfrom rbi import rbi as _risk, DEFAULTS\nfrom data_import import read_measurements_csv as _read_csv, read_sqlite_catalog as _read_sqlite_catalog, read_sqlite_table as _read_sqlite_table\ndef _evaluate(obj): return evaluate(obj, _today)\ndef _simulate(obj): return evaluate(obj[\'equipment\'], max(_today, obj[\'date\']))');
  py.globals.set('_today',today());template=JSON.parse(py.runPython('json.dumps(demo_equipment())'));
  const coords={pipe:[[27.5,48.6],[36.9,49.3],[74.6,44.2]],vessel:[[27.1,43.1],[44.5,51.3],[62.1,51.5]],tank:[[41,75.2],[45.6,59.2],[50.5,40.9]]};
  template.forEach(e=>e.points.forEach((p,i)=>{[p.x,p.y]=coords[e.family][i];p.cml='CML-0'+(i+1);p.basis='Mínimo del expediente académico; alerta con margen de '+fmt(p.alert_mm-p.minimum_mm)+' mm para intervención.'}));
  const defaultCase={version:1,equipment:structuredClone(template),rbi:{...JSON.parse(py.runPython('json.dumps(DEFAULTS)')),costBasis:defaultCostBasis}};
- initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);storedCase=raw;
+ defaultCase.comparisons=[];initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);storedCase=raw;
  if(raw){try{const temp=JSON.parse(raw);analysis=evaluateAll(temp);project=temp;$('saved').textContent='Caso recuperado'}catch{notify('Respaldo local incompatible. Se muestra el caso de demostración.')}}
  activateDeepLink();render()
  }catch(err){$('app').innerHTML='<h1>No se pudo abrir la aplicación</h1><p>'+esc(message(err))+'</p><p>Abra el enlace publicado o inicie el servidor local desde la carpeta del proyecto.</p>'}

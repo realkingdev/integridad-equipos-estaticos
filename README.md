@@ -14,12 +14,15 @@ Con Python 3, ejecutar `python -m http.server 8000 --bind 127.0.0.1` desde este 
 - En Inspecciones, cambia la fecha de evaluación para explorar vencimientos. La fecha simulada afecta las vistas durante la sesión.
 - Cambia las variables directamente en Análisis RBI, Cálculo de diseño o Simular lectura para ver una comparación inmediata con el caso guardado. Los cambios se conservan al seleccionar Guardar o Aplicar.
 - En RBI, Calcular para un objetivo obtiene la consecuencia por evento que corresponde a un riesgo anual dado y a la frecuencia del escenario activo.
-- En Fuentes de datos, consulta un endpoint REST con CORS o lee un archivo CSV, JSON o SQLite. La importación pasa por una vista previa y mantiene las lecturas existentes.
-- En Asistente, pregunta por TAG o TML, condición, lecturas, pendientes o riesgo. Las respuestas consultan los registros guardados y enlazan a su fuente.
+- En cada simulador, captura las entradas y resultados en las alternativas A y B. Las capturas se guardan con el caso y Cargar entradas devuelve una alternativa al formulario para recalcularla.
+- En Fuentes de datos, consulta un endpoint REST con CORS o lee un archivo CSV, JSON o SQLite. Vincula tus encabezados, elige revisar la fecha y unidad de origen y guarda la configuración en el navegador. La vista previa distingue nuevas lecturas, duplicados y conflictos.
+- En Asistente, pregunta por TAG o TML, condición, lecturas, pendientes o riesgo. Las respuestas consultan los registros guardados y enlazan a su fuente. Las consultas por plazo abren la agenda filtrada y las lecturas hipotéticas abren el simulador con la propuesta cargada.
+
+- Abre la evidencia de cada resultado para ver sus entradas, unidades, criterios y referencias.
 
 ## Fuentes de datos
 
-Las mediciones tabulares requieren TAG, TML, fecha y espesor. El formato mostrado en la aplicación usa `tag;tml;fecha;espesor;unidad;tecnica;observaciones`. SQLite requiere una tabla ordinaria `mediciones`. La API debe permitir solicitudes GET de lectura desde la app mediante CORS. El token Bearer se usa en la solicitud y se mantiene fuera de los datos guardados. La vista previa acepta hasta 5.000 filas y 2 MB por consulta o archivo. Un respaldo JSON de Estrato también permite incorporar equipos y puntos nuevos.
+Las mediciones tabulares requieren TAG, TML, fecha y espesor. El formato mostrado en la aplicación usa `tag;tml;fecha;espesor;unidad;tecnica;observaciones`. SQLite permite elegir cualquier tabla ordinaria de la base. El ejemplo utiliza `mediciones`. La API debe permitir solicitudes GET de lectura desde la app mediante CORS. El token Bearer se usa en la solicitud y se mantiene fuera de los datos guardados. La vista previa acepta hasta 5.000 filas y 2 MB por consulta o archivo. Un respaldo JSON de Estrato también permite incorporar equipos y puntos nuevos.
 
 ## Alcance académico
 

@@ -18,6 +18,8 @@ class EngineeringTests(unittest.TestCase):
         a,b,_=result["points"]
         self.assertAlmostEqual(a["life_years"],14.166666667)
         self.assertAlmostEqual(b["short_rate"],.30)
+        self.assertEqual(b["calculation"]["short_rate"], dict(from_date="2022-10-01", start_mm=6.0, years=4))
+        self.assertEqual(b["calculation"]["long_rate"]["years"], 10)
         self.assertEqual(a["due"],"2028-06-01")
 
     def test_accessory_uses_documented_service_minimum(self):

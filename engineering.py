@@ -103,7 +103,7 @@ def inspect_point(point, eq, calc, today):
              minimum_mm=minimum,alert_mm=alert,short_rate=None,long_rate=None,rate=None,
              life_years=None,due=None,interval_years=None,governing="Revisar historial",
              cap_years=cap,half_life_years=None,alert_years=None,
-             series_start=None, previous_date=None, rate_basis=None,
+             series_start=None, previous_date=None, rate_basis=None, calculation={},
              inspection_type=kind,reference=ref,warnings=[],overdue=False,design=calc)
     if not localized_design:
         out["warnings"].append("Accesorio: la evaluación usa el mínimo documentado del punto. El cálculo de tramo recto se muestra como referencia del equipo.")
@@ -143,8 +143,10 @@ def inspect_point(point, eq, calc, today):
     out.update(series_start=rows[0][0].isoformat(), previous_date=rows[-2][0].isoformat())
     candidates=[]
     for key,r in [("long_rate",rows[0]),("short_rate",rows[-2])]:
-        rate=(r[1]-value)/years_between(r[0],latest)
-        out[key]=rate
+        elapsed = years_between(r[0], latest)
+        rate = (r[1] - value) / elapsed
+        out[key] = rate
+        out["calculation"][key] = dict(from_date=r[0].isoformat(), start_mm=r[1], years=elapsed)
         if rate>0:
             candidates.append(rate)
         else:

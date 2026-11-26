@@ -114,3 +114,31 @@
   .mobile-result {display:block;position:sticky;top:0;z-index:4;order:-2;padding:9px 13px;border:1px solid #ceead8;background:#e5f3e9;color:#184b3c;border-radius:7px;font:650 13px/1.35 'Segoe UI',sans-serif;}
   .scenario-result {order:0;}
 }
+
+/* Column mapping, saved scenarios and calculation evidence */
+.profile-bar {display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:14px 0;margin:8px 0;border-bottom:1px solid var(--line);}
+.profile-bar label,.source-mapping label,.panel label:has([name="sqlite-table"]) {display:grid;gap:4px;min-width:0;font-size:13px;color:var(--muted);font-weight:600;}
+.mapping-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;}
+.mapping-fields select {min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;}
+.mapping-sample {overflow-wrap:anywhere;}
+.compare-slots {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.compare-slot {min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:12px;background:#f5f9f6;border:1px solid var(--line);border-radius:9px;}
+.compare-slot small {display:block;}
+.slot-letter {display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:#266652;color:#fff;font-weight:700;}
+.compare-slot .buttons {margin-left:auto;justify-content:flex-start;gap:5px}
+.compare-slot button {font-size:12px;padding:6px 9px;}
+.comparison-panel {margin-bottom:22px;scroll-margin-top:15px;}
+.comparison-panel table td,.evidence table td {font-variant-numeric:tabular-nums;}
+.comparison-panel table th {white-space:normal;}
+.evidence {margin:15px 0 3px;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:#f7faf8;}
+.evidence summary {color:#1c5d4a;}
+.evidence-reference {font-size:12px;color:var(--muted);margin-top:8px;}
+.evidence th {white-space:normal;min-width:100px;}
+.schedule-window {display:flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;}
+.schedule-window input {width:91px;}
+@media(max-width:700px) {
+  .mapping-fields {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .compare-slots {grid-template-columns:minmax(0,1fr);}
+  .comparison-panel table {min-width:380px;}
+  .evidence th {min-width:85px;}
+}

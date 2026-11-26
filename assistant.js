@@ -4,6 +4,8 @@ const examples=[
   '¿Cuándo se inspecciona el codo L-101?',
   '¿Qué puntos están bajo el mínimo?',
   '¿Cuál es el riesgo económico RBI?',
+  '¿Qué inspecciones de tubería vencen en 90 días?',
+  '¿Qué pasa si el codo L-101 mide 4,4 mm?',
   '¿Dónde conecto una base de datos?'
 ];
 const chatNormalize = text=>labelKey(text).replace(/[^a-z0-9]+/g,' ').trim();
@@ -136,6 +138,8 @@ function answerCase(question) {
       links:[chatLink('Abrir cálculo de diseño',pointHref(e,p)+'/diseno')]};
   }
 
+  const action=simulationAnswer(question,namedRows,assets)||agendaAnswer(question,rows,assets);
+  if (action) return action;
   if (namedRows.length===1) return chatPointAnswer(namedRows[0],q);
   if (matchTml && namedRows.length>1) return chatList(rows,'Ese TML aparece en varios equipos. Selecciona el TAG que quieres consultar.');
   if (/cuant[oa]s|cantidad|total|numero de/.test(q)) {

@@ -6,23 +6,23 @@ let sourceUrl='';
 function sourcePage() {
   return hero('CONEXIONES E IMPORTACIONES','Fuentes de datos','Consulta bases de datos y agrega sus lecturas al caso activo.')+
     '<div class="twocol source-grid"><form id="remote-source" class="panel scenario-form">'+
-    '<div class="section-kicker"><i></i> API REST</div><h2>Consultar una fuente web</h2>'+
+    '<div class="section-kicker"><i></i> 1 · API REST</div><h2>Consultar una fuente web</h2>'+
     '<p class="muted">El endpoint debe entregar JSON o CSV y permitir el acceso desde Estrato mediante CORS.</p>'+
     '<label class="entry"><span>URL del endpoint</span><input name="url" type="url" placeholder="https://datos.ejemplo.cl/mediciones" value="'+esc(sourceUrl)+'" required></label>'+
     '<label class="entry"><span>Token de lectura · opcional</span><input name="token" type="password" autocomplete="off" placeholder="Bearer"></label>'+
     '<div class="scenario-actions"><button class="primary" '+(sourceReading?'disabled':'')+'>Consultar y previsualizar</button></div>'+
     '<small class="scenario-note">El token se utiliza para esta consulta y se borra del campo después de enviarlo.</small></form>'+
-    '<form id="file-source" class="panel scenario-form"><div class="section-kicker"><i></i> ARCHIVOS LOCALES</div><h2>Leer una base o un archivo</h2>'+
-    '<p class="muted">SQLite con tabla <b>mediciones</b>, CSV de lecturas, JSON de una API o respaldo Estrato.</p>'+
+    '<form id="file-source" class="panel scenario-form"><div class="section-kicker"><i></i> 1 · ARCHIVOS LOCALES</div><h2>Leer una base o un archivo</h2>'+
+    '<p class="muted">SQLite, CSV de lecturas, JSON de una API o respaldo Estrato. Vincula tus columnas después de abrir la fuente.</p>'+
     '<label class="entry"><span>Seleccionar archivo · máximo 2 MB</span><input name="sourceFile" type="file" accept=".db,.sqlite,.sqlite3,.db3,.csv,.tsv,.json" required></label>'+
     '<div class="scenario-actions"><button class="primary" '+(sourceReading?'disabled':'')+'>Leer y previsualizar</button>'+
     '<button type="button" data-source-example>Descargar plantilla CSV</button></div></form></div>'+
     (sourceReading?'<p class="panel muted" role="status">Leyendo fuente de datos…</p>':'')+
     (sourceError?'<p class="panel form-error" role="alert">'+esc(sourceError)+'</p>':'')+
     (sourceInfo?'<p class="panel note" role="status">'+esc(sourceInfo)+'</p>':'')+
-    sourcePreviewPanel()+
+    sqliteTablePanel()+sourceMappingPanel()+sourcePreviewPanel()+
     '<details class="panel technical-model"><summary>Formato para conectar una fuente</summary>'+
-    '<p>Usa las columnas <code>tag</code>, <code>tml</code>, <code>fecha</code> (AAAA-MM-DD) y <code>espesor</code>. Son opcionales <code>unidad</code> (mm o in), <code>tecnica</code> y <code>observaciones</code>.</p>'+
+    '<p>Vincula las columnas de tu origen con TAG, TML, fecha y espesor. Puedes elegir el formato de fecha y la unidad predeterminada. Son opcionales <code>unidad</code> (mm o in), <code>tecnica</code> y <code>observaciones</code>.</p>'+
     '<p>Una lista JSON puede venir directa o bajo <code>mediciones</code>, <code>measurements</code> o <code>data</code>. Un respaldo Estrato agrega equipos y puntos nuevos, además de lecturas faltantes.</p>'+
     '<pre class="equation mono">CREATE TABLE mediciones (\n  tag TEXT, tml TEXT, fecha TEXT, espesor REAL,\n  unidad TEXT, tecnica TEXT, observaciones TEXT\n);</pre>'+
     '<p>El TAG y el TML de cada lectura deben existir en el caso activo. La vista previa informa las coincidencias, los conflictos y las filas pendientes.</p></details>';
@@ -30,14 +30,14 @@ function sourcePage() {
 
 function sourcePreviewPanel() {
   if (!sourcePreview) return '';
-  const {label, rows, rejected, duplicate, added, assets, points} = sourcePreview;
+  const {label, rows, rejected, conflicts, duplicate, added, assets, points} = sourcePreview;
   const summary = [
     comparisonValue('Lecturas nuevas',String(added)),comparisonValue('Ya registradas',String(duplicate)),
-    comparisonValue('Filas con observación',String(rejected)),
+    comparisonValue('Conflictos',String(conflicts)),comparisonValue('Filas con observación',String(rejected)),
     ...(assets?[comparisonValue('Equipos nuevos',String(assets))]:[]),
     ...(points?[comparisonValue('Puntos nuevos',String(points))]:[])
   ].join('');
-  return '<section class="panel"><div class="row"><div><div class="section-kicker">VISTA PREVIA</div><h2>'+esc(label)+'</h2></div>'+
+  return '<section class="panel"><div class="row"><div><div class="section-kicker">3 · VISTA PREVIA</div><h2>'+esc(label)+'</h2></div>'+
     '<button type="button" class="primary" data-source-apply '+(added||assets||points?'':'disabled')+'>Importar datos validados</button></div>'+
     '<div class="live-metrics">'+summary+'</div>'+
     '<div class="scroll"><table><thead><tr><th>Fila</th><th>TAG / TML</th><th>Fecha</th><th>Espesor</th><th>Resultado</th></tr></thead>'+
@@ -101,51 +101,36 @@ async function readLocalSource(file) {
   if (!file.size || file.size>sourceLimit) throw Error('El archivo debe tener contenido y pesar hasta 2 MB.');
   const magic=await file.slice(0,16).text();
   if (magic==='SQLite format 3\u0000') {
-    await py.loadPackage('sqlite3');
-    const path='/tmp/estrato-import.sqlite';
-    py.FS.writeFile(path,new Uint8Array(await file.arrayBuffer()));
-    try {return {rows:call('_read_sqlite',path)}} finally {py.FS.unlink(path)}
+    return prepareSqlSource(file);
   }
   return parseTabular(await file.text());
 }
 
 const labelKey = text=>String(text ?? '').normalize('NFD').replace(/\p{M}/gu,'').trim().toLowerCase();
-const sourceField = (row,...keys)=>keys.map(key=>row[key]).find(v=>v!==undefined&&v!==null&&v!=='') ?? '';
-function readSourceRecord(record) {
-  if (!record || typeof record!=='object' || Array.isArray(record)) return null;
-  const row=Object.fromEntries(Object.entries(record).map(([key,val])=>[labelKey(key),val]));
-  const tag=String(sourceField(row,'tag')).trim();
-  const tml=String(sourceField(row,'tml','point_id','punto')).trim();
-  const date=String(sourceField(row,'fecha','date')).trim();
-  const val=String(sourceField(row,'espesor','thickness','espesor_mm')).trim().replace(',','.');
-  const unit=String(sourceField(row,'unidad','unit')||'mm').toLowerCase().trim();
-  const technique=String(sourceField(row,'tecnica','technique')||'UT').trim();
-  const notes=String(sourceField(row,'observaciones','notes')).trim();
-  return {tag,tml,date,raw:val,thickness:val===''?NaN:Number(val),unit,technique,notes};
-}
-
-function importPlan(payload,label) {
+function importPlan(payload,label,mapping) {
   const candidate=structuredClone(project);
   const registry=new Map(candidate.equipment.map(e=>[labelKey(e.tag),e]));
   const rows=[];
-  let added=0,duplicate=0,rejected=0,assets=0,points=0;
+  let added=0,duplicate=0,rejected=0,conflicts=0,assets=0,points=0;
   const push=(row,state)=>rows.push({...row,index:rows.length+1,state});
+  const toMm=(amount,unit)=>amount*(unit==='in'?25.4:1);
 
   function stage(item, measurement) {
     const {tag,tml,date,thickness,unit,technique,notes}=item;
     const row={tag,tml,date,thickness:item.raw===undefined?fmt(thickness,3):item.raw+' '+unit};
     const parsed=Date.parse(date+'T00:00:00Z');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(parsed)||new Date(parsed).toISOString().slice(0,10)!==date||
-        date>today()||!Number.isFinite(thickness)||thickness<0||!['mm','in'].includes(unit)||!technique) {
-      rejected++;push(row,'Fecha, espesor, unidad o técnica inválidos');return;
-    }
+    const invalidDate=!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(parsed)||new Date(parsed).toISOString().slice(0,10)!==date;
+    const problem=invalidDate?'Fecha inválida para el formato seleccionado':date>today()?'Fecha posterior a hoy':
+      !Number.isFinite(thickness)||thickness<0?'Espesor inválido':!['mm','in'].includes(unit)?'Unidad inválida · Usa mm o in':
+      !technique?'Técnica de medición vacía':'';
+    if (problem) {rejected++;push(row,problem);return}
     const e=registry.get(labelKey(tag));
     const p=e?.points.find(point=>labelKey(point.id)===labelKey(tml));
     if (!p) {rejected++;push(row,'TAG o TML sin coincidencia');return}
     const existing=p.measurements.find(m=>m.date===date);
     if (existing) {
-      if (existing.thickness===thickness&&existing.unit===unit) {duplicate++;push(row,'Lectura existente')}
-      else {rejected++;push(row,'Conflicto con una lectura existente')}
+      if (Math.abs(toMm(existing.thickness,existing.unit)-toMm(thickness,unit))<1e-9) {duplicate++;push(row,'Lectura existente')}
+      else {conflicts++;push(row,'Conflicto con una lectura existente')}
       return;
     }
     const ordered=[...p.measurements].sort((a,b)=>a.date.localeCompare(b.date));
@@ -182,13 +167,13 @@ function importPlan(payload,label) {
   } else {
     if (payload.rows.length>sourceRowLimit) throw Error('La fuente excede 5.000 filas.');
     for (const record of payload.rows) {
-      const item=readSourceRecord(record);
+      const item=resolvedSourceRecord(record,mapping);
       if (item) stage(item);
       else {rejected++;push({tag:'—',tml:'—'},'Fila incompatible')}
     }
   }
   if (added||assets||points) evaluateAll(candidate);
-  return {base:project,candidate,label,rows,rejected,duplicate,added,assets,points};
+  return {base:project,candidate,label,rows,rejected,conflicts,duplicate,added,assets,points};
 }
 
 document.addEventListener('submit',async event=>{
@@ -197,7 +182,7 @@ document.addEventListener('submit',async event=>{
   event.preventDefault();
   if (sourceReading) return;
   const fields=inputsOf(form);
-  sourceError='';sourceInfo='';sourcePreview=null;
+  sourceError='';sourceInfo='';sourcePreview=null;sourcePayload=null;sourceDb=null;sourceTables=[];sourceTable=null;
   try {
     sourceReading=true;
     const remote=form.id==='remote-source';
@@ -206,11 +191,11 @@ document.addEventListener('submit',async event=>{
       sourceUrl=url.origin+url.pathname; // Los parámetros y credenciales quedan fuera de la vista persistente.
       form.elements.token.value='';
       render();
-      sourcePreview=importPlan(parseTabular(await getSourceResponse(url,String(fields.token||'').trim())),url.hostname);
+      setSourcePayload(parseTabular(await getSourceResponse(url,String(fields.token||'').trim())),url.hostname);
       sourceUrl=url.origin+url.pathname+url.search;
     } else {
       render();
-      sourcePreview=importPlan(await readLocalSource(fields.sourceFile),fields.sourceFile.name);
+      setSourcePayload(await readLocalSource(fields.sourceFile),fields.sourceFile.name);
     }
   } catch (err) {sourceError=message(err)}
   finally {sourceReading=false;if(route()[0]==='fuentes')render()}
@@ -232,8 +217,8 @@ document.addEventListener('click',event=>{
   try {
     const {candidate,added}=sourcePreview;
     commit(draft=>{draft.equipment=candidate.equipment});
-    sourcePreview=null;
-    sourceInfo='Importación guardada · '+added+' lecturas nuevas.';
+    sourcePreview=null;sourcePayload=null;sourceDb=null;sourceTables=[];sourceTable=null;
+    sourceInfo='Importación guardada · '+added+(added===1?' lectura nueva.':' lecturas nuevas.');
     render();
   } catch (err) {
     sourceError=message(err);

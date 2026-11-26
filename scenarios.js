@@ -45,9 +45,9 @@ function scenarioShell(kind, title, description, inputs, saveLabel) {
       '<div class="section-kicker"><i></i> ENTRADAS EDITABLES</div><h2>'+title+'</h2><p class="muted">'+description+'</p>'+
       inputs+'<p class="form-error" data-scenario-error role="alert" hidden></p>'+
       '<div class="scenario-actions"><button type="submit" class="primary" data-scenario-save disabled>'+saveLabel+'</button>'+
-      '<button type="button" data-scenario-reset>Restablecer</button></div>'+
+      '<button type="button" data-scenario-reset>Restablecer</button><button type="button" data-show-comparison>Escenarios A/B ↓</button></div>'+
       '<small class="scenario-note" data-scenario-note>Las simulaciones son temporales. Aplica los cambios para conservarlos.</small>'+
-    '</form><section class="panel scenario-result" aria-label="Resultado del escenario" id="scenario-result"></section></div>';
+    '</form><section class="panel scenario-result" aria-label="Resultado del escenario" id="scenario-result"></section></div><section class="panel comparison-panel" id="scenario-comparison"></section>';
 }
 
 const rbiDefinitions = [

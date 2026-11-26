@@ -7,7 +7,7 @@ const key='estrato-project-v1';
 let py, project, analysis=[], tab='monitoreo', pointIndex=0, currentId='', template, filter='', familyFilter='', statusFilter='', saveForm, assessmentDate='', initialCase, storedCase;
 const fmt=(n,d=2)=>Number.isFinite(n)?n.toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
 const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
-const dateLabel=s=>s?s.split('-').reverse().join('/'):'Por determinar';
+const dateLabel=s=>typeof s==='string'&&s?s.split('-').reverse().join('/'):'Por determinar';
 const action=(label,id,primary=false)=>`<button type="button" data-act="${id}" class="${primary?'primary':''}">${esc(label)}</button>`;
 const badge=s=>`<span class="pill ${({Normal:'ok',Alerta:'warn','Bajo mínimo':'bad','Inspección vencida':'bad',Alta:'bad',Media:'warn',Baja:'ok'})[s]||''}">${esc(s)}</span>`;
 const metric=(label,val)=>`<div class="metric"><small>${esc(label)}</small><b>${esc(val)}</b></div>`;
@@ -60,8 +60,8 @@ const field=(name,label,value,type='text',attrs='required')=>`<label>${esc(label
 const opts=(values,selected)=>values.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(selected)?'selected':''}>${esc(l)}</option>`).join('');
 const select=(name,label,list,value)=>`<label>${esc(label)}<select name="${name}">${opts(list,value)}</select></label>`;
 function route(){
- const [name,id,point='',view='']=location.hash.slice(1).split('/');
- try{return [name||'inicio',id?decodeURIComponent(id):'',decodeURIComponent(point),view]}catch{return ['equipos','']}
+ const [name,id,point='',view='',proposal='']=location.hash.slice(1).split('/');
+ try{return [name||'inicio',id?decodeURIComponent(id):'',decodeURIComponent(point),decodeURIComponent(view),proposal]}catch{return ['equipos','']}
 }
 function current(){const [,id]=route();const i=project.equipment.findIndex(e=>e.tag===id);return [project.equipment[i],analysis[i],i]}
 function cards(list){return '<div class="assets">'+list.map(([e,r])=>`<a class="card" href="${esc(link(e))}"><img src="${esc(photo(e))}" alt="Esquema de ${esc(e.tag)}"><div class="cardbody"><div class="row"><span class="mono">${esc(e.tag)}</span>${badge(r.status)}</div><h3>${esc(e.name)}</h3><small>${esc(family[e.family])} · ${e.points.length} ubicaciones</small><div class="card-meta"><span>Próxima medición</span><strong>${dateLabel(r.due)}</strong></div></div></a>`).join('')+'</div>'}
@@ -77,7 +77,7 @@ function listPage(name){
  const rows=visibleSchedule();
  const entries=project.equipment.map((e,i)=>[e,analysis[i]]).filter(([e,r])=>matchesAsset(e)&&matchesCondition(r,statusFilter));
  return hero('GESTIÓN DE ACTIVOS',navNames[name],isEq?'Antecedentes, esquemas y mediciones por equipo.':'Fechas y criterios de inspección por punto de monitoreo.',isEq?action('Caso original','reset')+action('Importar caso','import')+action('Exportar','export')+action('＋ Crear equipo','new',true):action('Exportar agenda CSV','csv'))+
- `<div class="filters"><input id="filter" aria-label="Buscar por TAG o ubicación" placeholder="Buscar TAG, planta o área" value="${esc(filter)}"><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select>${isEq?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'}</div>`+
- (isEq?(entries.length?cards(entries):'<p class="empty">Sin equipos para este filtro.</p>'):(rows.length?'<div class="panel">'+schedule(rows)+'</div>':'<p class="empty">Sin puntos para este filtro.</p>'))
+ `<div class="filters"><input id="filter" aria-label="Buscar por TAG o ubicación" placeholder="Buscar TAG, planta o área" value="${esc(filter)}"><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select>${isEq?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'+scheduleWindowInput()}</div>`+
+ (isEq?(entries.length?cards(entries):'<p class="empty">Sin equipos para este filtro.</p>'):(rows.length?'<div class="panel">'+schedule(rows)+'</div>':'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>'))
 }
 

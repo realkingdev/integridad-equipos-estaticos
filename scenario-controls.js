@@ -24,6 +24,7 @@ function initializeScenario() {
   if (draft?.signature===signature) {
     for (const [name,value] of Object.entries(draft.values)) form.elements[name].value=value;
   } else scenarioDrafts.delete(context.id);
+  applyAssistantReading(form,context);
   if (form.dataset.scenario==='risk') {
     $('target-indicator').value=liveTargetState.indicator;
     $('target-value').value=liveTargetState.values[liveTargetState.indicator];
@@ -90,13 +91,13 @@ function refreshScenario() {
       const values={...scenarioNumbers(form,rbiDefinitions),costBasis};
       const changed=Object.keys(values).some(name=>values[name]!==context.saved[name]);
       const outcome=call('_risk',values);
-      result.innerHTML=renderRiskResult(values,outcome,call('_risk',context.saved),changed);
+      copyEvidenceState(result,renderRiskResult(values,outcome,call('_risk',context.saved),changed)+riskEvidence(values,outcome));
       const detailsOpen=$('scenario-extras').querySelector('.technical-model')?.open;
       $('scenario-extras').innerHTML=riskCompare(values,outcome)+riskModelDetails(outcome);
       if (detailsOpen) $('scenario-extras').querySelector('.technical-model').open=true;
       mobile.textContent='Riesgo '+fmt(outcome.cost_risk,0)+' CLP/año · Prioridad '+outcome.priority;
       liveRbiResult=outcome;
-      activeScenario.next={values};
+      activeScenario.next={values,result:outcome};
       saveButton.disabled=!changed;
     } else if (kind==='design') {
       const values=scenarioNumbers(form,[...designDefinitions(context.equipment),...operationDefinitions(context.equipment)]);
@@ -110,13 +111,13 @@ function refreshScenario() {
       const changed=pointChanged||Object.keys(values).some(name=>values[name]!==context.equipment[name]);
       const equipment={...context.equipment,...values,points:context.equipment.points.map((p,i)=>i===context.indexOfPoint?point:p)};
       const evaluation=call('_evaluate',equipment);
-      result.innerHTML=renderDesignResult(equipment,point,evaluation.points[context.indexOfPoint],context.saved,context.equipment,changed);
+      copyEvidenceState(result,renderDesignResult(equipment,point,evaluation.points[context.indexOfPoint],context.saved,context.equipment,changed)+designEvidence(equipment,point,evaluation.points[context.indexOfPoint]));
       mobile.textContent='Espesor requerido '+fmt(evaluation.points[context.indexOfPoint].design.required_mm,3)+' mm';
-      activeScenario.next={values,point,pointChanged};
+      activeScenario.next={values,point,pointChanged,equipment,result:evaluation.points[context.indexOfPoint]};
       saveButton.disabled=!changed;
     } else {
       const next=draftInspection(form,context);
-      result.innerHTML=renderInspectionResult(next.result,context.saved,next.changed);
+      copyEvidenceState(result,renderInspectionResult(next.result,context.saved,next.changed)+pointEvidence(context.equipment,next.draftPoint,next.result,next.readingChanged));
       mobile.textContent=next.result.status+' · '+(next.result.due?'Próxima '+dateLabel(next.result.due):'Fecha por determinar');
       activeScenario.next=next;
       saveButton.disabled=!next.changed||next.future;
@@ -133,6 +134,7 @@ function refreshScenario() {
     result.innerHTML='<div class="scenario-empty"><h2>Resultado pendiente</h2><p>Revisa el mensaje junto a las entradas.</p></div>';
   }
   rbiGoal();
+  renderComparison();
 }
 
 function commitScenario(change, msg) {
@@ -157,9 +159,7 @@ function saveInspection(next, context) {
       commitScenario(project=>{
         const point=project.equipment[context.index].points[context.indexOfPoint];
         if (thresholdsChanged) {
-          point.minimum_mm=draftPoint.minimum_mm;
-          point.alert_mm=draftPoint.alert_mm;
-          point.basis=reason;
+          auditThresholds(point,draftPoint.minimum_mm,draftPoint.alert_mm,reason);
         }
         if (readingChanged) {
           const record={...reading,technique:form.get('technique').trim(),notes:form.get('notes').trim()};

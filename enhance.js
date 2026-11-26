@@ -1,5 +1,5 @@
 function visibleSchedule() {
-  return allRows().filter(({e,r}) => matchesAsset(e) && matchesCondition(r,statusFilter));
+  return allRows().filter(({e,r}) => matchesAsset(e) && matchesCondition(r,statusFilter) && matchesWindow(r,scheduleDays) && (!scheduleTag || e.tag===scheduleTag));
 }
 
 function matchesCondition(result,state) {
