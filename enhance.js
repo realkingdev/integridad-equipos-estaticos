@@ -14,10 +14,10 @@ function matchesAsset(e) {
 
 function statusSummary(rows) {
   const states = ['Bajo mínimo','Alerta','Inspección vencida','Información insuficiente','Normal'];
-  return '<section class="condition-strip" aria-label="Condición de los puntos">' + states.map(state => {
+  return '<div class="condition-strip" aria-label="Condición de los puntos" role="group">' + states.map(state => {
     const count = rows.filter(({r}) => matchesCondition(r,state)).length;
     return '<button data-status="' + esc(state) + '">' + badge(state==='Inspección vencida'?'Con fecha vencida':state) + '<strong>' + count + '</strong></button>';
-  }).join('') + '</section>';
+  }).join('') + '</div>';
 }
 
 function trendBasis(s) {

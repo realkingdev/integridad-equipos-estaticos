@@ -1,6 +1,9 @@
-function scheduleSummary(e,r){
- const p=r.points.find(p=>p.id===r.governing);
- return '<div class="panel row"><div><div class="eyebrow">PLAN DEL EQUIPO</div><strong>'+esc(r.governing)+' · '+dateLabel(r.due)+'</strong><p class="muted">'+esc(p?.governing||'Revisar antecedentes pendientes')+'</p></div>'+badge(r.status)+'</div>'
+function scheduleSummary(e,r) {
+ const point=r.points.find(point=>point.id===r.governing);
+ return '<section class="panel plan-banner"><div class="row"><h2>Plan del equipo</h2>'+badge(r.status)+'</div>'+
+   '<div class="plan-fields"><div><small>Punto gobernante</small><strong class="mono">'+esc(point?.id||'—')+'</strong></div>'+
+   '<div><small>Próxima medición</small><strong class="table-number">'+dateLabel(r.due)+'</strong></div>'+
+   '<div><small>Criterio</small><strong>'+esc(point?.governing||'Revisar antecedentes pendientes')+'</strong></div></div></section>';
 }
 function designPointChooser(e,index) {
  const locations=e.points.map((p,i)=>[i,p.id+' · '+p.name]);

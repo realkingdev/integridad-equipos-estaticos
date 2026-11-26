@@ -10,7 +10,7 @@ const fmt=(n,d=2)=>Number.isFinite(n)?n.toLocaleString('es-CL',{minimumFractionD
 const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
 const dateLabel=s=>typeof s==='string'&&s?s.split('-').reverse().join('/'):'Por determinar';
 const action=(label,id,primary=false)=>`<button type="button" data-act="${id}" class="${primary?'primary':''}">${esc(label)}</button>`;
-const badge=s=>`<span class="pill ${({Normal:'ok',Alerta:'warn','Bajo mínimo':'bad','Inspección vencida':'bad',Alta:'bad',Media:'warn',Baja:'ok'})[s]||''}">${esc(s)}</span>`;
+const badge=s=>`<span class="pill ${({Normal:'ok',Alerta:'warn','Bajo mínimo':'bad','Inspección vencida':'bad','Con fecha vencida':'warn','Información insuficiente':'pending',Alta:'bad',Media:'warn',Baja:'ok','Nominal suficiente':'ok','Nominal bajo el requisito':'bad',Verificado:'ok',Revisar:'warn'})[s]||''}">${esc(s)}</span>`;
 const metric=(label,val)=>`<div class="metric"><small>${esc(label)}</small><b>${esc(val)}</b></div>`;
 const link=e=>'#equipo/'+encodeURIComponent(e.tag);
 const photo=e=>e.image||'./assets/'+e.family+'.png';
@@ -65,20 +65,87 @@ function route(){
  try{return [name||'inicio',id?decodeURIComponent(id):'',decodeURIComponent(point),decodeURIComponent(view),proposal]}catch{return ['equipos','']}
 }
 function current(){const [,id]=route();const i=project.equipment.findIndex(e=>e.tag===id);return [project.equipment[i],analysis[i],i]}
-function cards(list){return '<div class="assets">'+list.map(([e,r])=>`<a class="card" href="${esc(link(e))}"><img src="${esc(photo(e))}" alt="Esquema de ${esc(e.tag)}"><div class="cardbody"><div class="row"><span class="mono">${esc(e.tag)}</span>${badge(r.status)}</div><h3>${esc(e.name)}</h3><small>${esc(family[e.family])} · ${e.points.length} ubicaciones</small><div class="card-meta"><span>Próxima medición</span><strong>${dateLabel(r.due)}</strong></div></div></a>`).join('')+'</div>'}
-function schedule(rows){return '<div class="scroll"><table><thead><tr><th>Equipo / punto</th><th>Componente</th><th>Condición</th><th>Próxima medición</th><th>Criterio gobernante</th></tr></thead><tbody>'+rows.map(({e,p,r})=>`<tr><td><a href="${esc(equipmentScreen(e,p))}">${esc(e.tag)} · ${esc(p.id)}</a></td><td>${esc(p.name)}</td><td>${badge(r.status)}${r.overdue && r.status!=='Inspección vencida'?'<small class="overdue-text">Fecha vencida</small>':''}</td><td>${dateLabel(r.due)}</td><td>${esc(r.governing||'Revisar historial')}</td></tr>`).join('')+'</tbody></table></div>'}
-function allRows(){return project.equipment.flatMap((e,i)=>e.points.map((p,j)=>({e,p,r:analysis[i].points[j]}))).sort((a,b)=>(a.r.due||'9999').localeCompare(b.r.due||'9999'))}
-function overview(){
- const rows=allRows(),eq=project.equipment;
- return '<div class="dashboard-intro">'+hero('CONTROL DE INTEGRIDAD','Vista general','Condición y seguimiento de los equipos estáticos.',action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true))+'</div>'+
- '<div class="kpis">'+[['Equipos registrados',eq.length],['Puntos de monitoreo',rows.length],['Puntos que requieren revisión',rows.filter(x=>x.r.status!=='Normal'||x.r.overdue).length]].map(([l,v])=>`<div class="kpi"><small>${l}</small><b>${v}</b></div>`).join('')+'</div>'+statusSummary(rows)+'<div class="row"><h2>Equipos monitoreados</h2><a class="link" href="#equipos">Ver registro →</a></div>'+cards(eq.slice(0,3).map((e,i)=>[e,analysis[i]]))+'<div class="panel"><div class="row"><h2>Próximas inspecciones</h2><a class="link" href="#agenda">Ver todas →</a></div>'+schedule(rows.filter(x=>x.r.due).slice(0,5))+'</div>'
-}
-function listPage(name){
- const isEq=name==='equipos',states=['Normal','Alerta','Bajo mínimo','Inspección vencida','Información insuficiente'];
- const rows=visibleSchedule();
- const entries=project.equipment.map((e,i)=>[e,analysis[i]]).filter(([e,r])=>matchesAsset(e)&&matchesCondition(r,statusFilter));
- return hero('GESTIÓN DE ACTIVOS',navNames[name],isEq?'Antecedentes, esquemas y mediciones por equipo.':'Fechas y criterios de inspección por punto de monitoreo.',isEq?action('Caso original','reset')+action('Importar caso','import')+action('Exportar','export')+action('＋ Crear equipo','new',true):action('Exportar agenda CSV','csv'))+
- `<div class="filters"><input id="filter" aria-label="Buscar por TAG o ubicación" placeholder="Buscar TAG, planta o área" value="${esc(filter)}"><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select>${isEq?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'+scheduleWindowInput()}</div>`+
- (isEq?(entries.length?cards(entries):'<p class="empty">Sin equipos para este filtro.</p>'):(rows.length?'<div class="panel">'+schedule(rows)+'</div>':'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>'))
+const designCodes = {pipe:'ASME B31.3', vessel:'ASME VIII-1', tank:'API 650'};
+
+function panelHeading(title, detail='', actionMarkup='') {
+ return '<div class="row panel-heading section-heading"><div><h2>'+esc(title)+'</h2>'+
+   (detail?'<p class="muted">'+esc(detail)+'</p>':'')+'</div>'+actionMarkup+'</div>';
 }
 
+function cards(list) {
+ return '<div class="assets">'+list.map(([e,result])=>`<a class="card" href="${esc(link(e))}">
+   <div class="asset-visual"><img src="${esc(photo(e))}" alt="Esquema de ${esc(e.tag)}"></div>
+   <div class="cardbody">
+    <div class="row"><span class="mono">${esc(e.tag)}</span>${badge(result.status)}</div>
+    <h3>${esc(e.name)}</h3>
+    <small>${esc(family[e.family])} · ${esc(designCodes[e.family])} · ${e.points.length} TML</small>
+    <div class="card-meta"><span>Próxima medición</span><strong class="table-number">${dateLabel(result.due)}</strong></div>
+   </div>
+  </a>`).join('')+'</div>';
+}
+
+function schedule(rows, compact=false) {
+ if (!rows.length) return '<p class="empty">Sin fechas programadas.</p>';
+ const headings='<th scope="col" class="col-asset">Equipo / punto</th><th scope="col" class="col-state">Condición</th>'+
+   '<th scope="col" class="align-right col-thickness">Espesor [mm]</th><th scope="col" class="col-date">Próxima medición</th>'+
+   (compact?'':'<th scope="col" class="col-rule">Criterio gobernante</th>');
+ const body=rows.map(({e,p,r})=>`<tr>
+   <td class="asset-cell"><a href="${esc(equipmentScreen(e,p))}" class="table-number">${esc(e.tag)} · ${esc(p.id)}</a><small>${esc(p.name)}</small>
+     <small class="agenda-mobile-reading">${Number.isFinite(r.current_mm)?fmt(r.current_mm,2)+' mm':'Sin lectura'}</small>
+     ${compact?'':'<details class="agenda-mobile-rule"><summary>Criterio</summary><small>'+esc(r.governing||'Revisar historial')+'</small></details>'}</td>
+   <td>${badge(r.status)}${r.overdue && r.status!=='Inspección vencida'?'<small class="overdue-text">Fecha vencida</small>':''}</td>
+   <td class="table-number align-right col-thickness">${fmt(r.current_mm,2)}</td>
+   <td class="table-number">${dateLabel(r.due)}</td>
+   ${compact?'':'<td class="col-rule">'+esc(r.governing||'Revisar historial')+'</td>'}
+  </tr>`).join('');
+ return '<div class="scroll table-frame"><table class="data-table agenda-table'+(compact?' compact-table':'')+'"><thead><tr>'+
+   headings+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+}
+
+function allRows() {
+ return project.equipment.flatMap((e,i)=>e.points.map((p,j)=>({e,p,r:analysis[i].points[j]})))
+   .sort((a,b)=>(a.r.due||'9999').localeCompare(b.r.due||'9999'));
+}
+
+function overview() {
+ const rows=allRows(), assets=project.equipment;
+ const review=rows.filter(({r})=>r.status!=='Normal'||r.overdue).length;
+ const counts=[['Equipos registrados',assets.length],['Puntos de monitoreo',rows.length],['Puntos que requieren revisión',review]];
+ const metrics=counts.map(([label,count],i)=>`<div class="kpi ${i===2?'priority'+(review?' has-review':''):''}">
+   <small>${label}</small><b>${count}</b></div>`).join('');
+ const headline=hero('CONTROL DE INTEGRIDAD','Vista general',
+   'Estado de los equipos, mediciones y próximas inspecciones.',
+   action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
+ return '<div class="dashboard-intro">'+headline+'</div><div class="kpis">'+metrics+'</div>'+
+   '<div class="overview-workspace"><section class="panel">'+
+   panelHeading('Agenda de inspección','Evaluación al '+dateLabel(assessmentDate||today()),'<a href="#agenda" class="link">Ver agenda →</a>')+
+   schedule(rows.filter(({r})=>r.due).slice(0,5),true)+'</section>'+
+   '<section class="panel">'+panelHeading('Condición de los puntos','Filtra la agenda por condición.')+statusSummary(rows)+'</section></div>'+
+   panelHeading('Equipos monitoreados','', '<a href="#equipos" class="link">Ver registro →</a>')+
+   cards(assets.slice(0,3).map((e,i)=>[e,analysis[i]]));
+}
+
+function listPage(name) {
+ const isEquipment=name==='equipos';
+ const states=['Normal','Alerta','Bajo mínimo','Inspección vencida','Información insuficiente'];
+ const rows=visibleSchedule();
+ const entries=project.equipment.map((e,i)=>[e,analysis[i]]).filter(([e,r])=>matchesAsset(e)&&matchesCondition(r,statusFilter));
+ const actions=isEquipment
+   ?action('Caso original','reset')+action('Importar caso','import')+action('Exportar','export')+action('＋ Crear equipo','new',true)
+   :action('Exportar agenda CSV','csv');
+ const heading=hero(isEquipment?'GESTIÓN DE ACTIVOS':'PLANIFICACIÓN',navNames[name],
+   isEquipment?'Antecedentes, esquemas y mediciones por equipo.':'Fechas y criterios de inspección por punto de monitoreo.',actions);
+ const filters=`<div class="filters">
+  <label class="filter-field"><span>TAG o ubicación</span><input id="filter" aria-label="Buscar por TAG o ubicación" placeholder="Ej. L-101" value="${esc(filter)}"></label>
+  <label class="filter-field"><span>Familia</span><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select></label>
+  <label class="filter-field"><span>Condición</span><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select></label>
+  ${isEquipment?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'+scheduleWindowInput()}
+ </div>`;
+ const content=isEquipment
+   ?entries.length
+     ?panelHeading('Equipos registrados',entries.length+' de '+project.equipment.length+' equipos')+cards(entries)
+     :'<p class="empty panel">Sin equipos para este filtro.</p>'
+   :'<section class="panel">'+panelHeading('Programación de inspecciones',rows.length+' '+(rows.length===1?'punto de monitoreo':'puntos de monitoreo'))+
+     (rows.length?schedule(rows):'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>')+'</section>';
+ return heading+filters+content;
+}

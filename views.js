@@ -1,21 +1,133 @@
-function detail(){
- const [e,r]=current();if(!e)return '<h1>Equipo no encontrado</h1><a href="#equipos">Volver al registro</a>';
- if(currentId!==e.tag){currentId=e.tag;pointIndex=0;tab='monitoreo'}pointIndex=Math.min(pointIndex,e.points.length-1);
- const p=e.points[pointIndex],s=r.points[pointIndex];
- const drawing=`<div class="drawing"><img src="${esc(photo(e))}" alt="Esquema técnico de ${esc(e.name)}">${e.points.map((pt,i)=>`<button class="pin ${i===pointIndex?'active':''}" data-pin="${i}" title="${esc(pt.id+' '+pt.name)}" aria-label="${esc(pt.id+' '+pt.name)}" style="left:${pt.x}%;top:${pt.y}%">${i+1}</button>`).join('')}</div>`;
- const intro='<a class="back" href="#equipos">Registro de equipos</a>'+hero(e.tag+' / '+family[e.family],e.name,[e.plant,e.area,e.system].join(' · '),action('Editar equipo','edit')+action('＋ Medición','measure',true))+
- '<div class="tabs">'+Object.entries(equipmentTabs).map(([k,v])=>`<button type="button" data-tab="${k}" class="${tab===k?'active':''}" aria-current="${tab===k?'page':'false'}">${v}</button>`).join('')+'</div>';
- const trace=arr=>'<div class="note">'+arr.filter(Boolean).map(a=>'<p>'+esc(a)+'</p>').join('')+'</div>';
- if(tab==='documentos')return intro+documentPanel(e);
- if(tab==='diseno')return intro+renderDesignWorkbench(e,p);
- if(tab==='simular')return intro+renderInspectionWorkbench(e,p);
- if(tab==='ficha')return intro+'<div class="panel"><h2>Antecedentes del activo</h2>'+equipmentTable(e)+'</div>';
- const ms=[...p.measurements].sort((a,b)=>b.date.localeCompare(a.date));
- return intro+scheduleSummary(e,r)+`<div class="twocol"><div class="panel"><div class="row"><h2>Ubicaciones de monitoreo</h2>${action('＋ Punto','point')}</div>${drawing}<div class="row"><small>CML identifica la ubicación. TML identifica el punto medido.</small>${action('Cambiar esquema','image')}</div></div><div class="panel"><div class="row"><div class="eyebrow">${esc(p.cml+' / '+p.id)}</div>${badge(s.status)}</div><h2>${esc(p.name)}</h2><div class="metrics">${metric('Espesor medido',fmt(s.current_mm)+' mm')}${metric('Mínimo en servicio',fmt(s.minimum_mm)+' mm')}${metric('Alerta',fmt(s.alert_mm)+' mm')}${metric('Vida remanente',fmt(s.life_years)+' años')}</div><strong>Próxima medición · ${dateLabel(s.due)}</strong>${trace([s.governing,p.basis,...(s.warnings||[])])}<div class="buttons monitor-actions"><button type="button" data-tab="simular" class="primary">Simular lectura</button>${action('Editar punto','editpoint')}</div></div></div>
- <div class="twocol"><div class="panel"><h2>Evolución del espesor</h2><small>Espesor en mm por fecha de campaña</small><canvas id="trend" class="plot" aria-label="Tendencia temporal de espesores; valores en el historial"></canvas><div class="legend"><span><i></i>Medición</span><span class="projection"><i></i>Proyección hasta próxima fecha</span><span class="threshold"><i></i>Alerta</span><span class="minimum"><i></i>Mínimo</span></div></div><div class="panel"><h2>Evaluación de la tendencia</h2><div class="metrics">${metric('Largo plazo',fmt(s.long_rate,3)+' mm/a')}${metric('Corto plazo',fmt(s.short_rate,3)+' mm/a')}${metric('Tasa adoptada',fmt(s.rate,3)+' mm/a')}${metric('Intervalo',fmt(s.interval_years)+' años')}</div>${trendBasis(s)}${timing(s)}${pointEvidence(e,p,s)}</div></div>
- <div class="panel"><h2>Historial de mediciones</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Espesor</th><th>Técnica</th><th>Serie</th><th>Observación</th><th>Acción</th></tr></thead><tbody>${ms.map(m=>`<tr><td>${dateLabel(m.date)}</td><td>${fmt(m.thickness)} ${esc(m.unit)}</td><td>${esc(m.technique)}</td><td>${esc(m.epoch??0)}</td><td>${esc(m.notes)}${m.source?'<small class="source-origin">Fuente · '+esc(m.source)+'</small>':''}${revisionCell(m)}</td><td><button type="button" data-reading="${esc(m.date)}">Corregir</button></td></tr>`).join('')}</tbody></table>${ms.length?'':'<p class="empty">Sin lecturas. Registra la primera medición para iniciar el historial.</p>'}</div></div>`
+function detail() {
+ const [equipment,result]=current();
+ if (!equipment) return '<h1>Equipo no encontrado</h1><a href="#equipos" class="link">Volver al registro</a>';
+ if (currentId!==equipment.tag) {currentId=equipment.tag;pointIndex=0;tab='monitoreo'}
+ pointIndex=Math.min(pointIndex,equipment.points.length-1);
+ const point=equipment.points[pointIndex], status=result.points[pointIndex];
+
+ const header='<a class="back" href="#equipos">Registro de equipos</a>'+
+   hero(equipment.tag+' / '+family[equipment.family],equipment.name,
+     [equipment.plant,equipment.area,equipment.system].join(' · '),
+     action('Editar equipo','edit')+action('＋ Medición','measure',true))+
+   equipmentMeta(equipment)+
+   '<div class="tabs" aria-label="Vistas del equipo">'+Object.entries(equipmentTabs).map(([key,title])=>
+     '<button type="button" data-tab="'+key+'" class="'+(tab===key?'active':'')+'" aria-current="'+
+     (tab===key?'page':'false')+'">'+esc(title)+'</button>').join('')+'</div>';
+
+ if (tab==='documentos') return header+documentPanel(equipment);
+ if (tab==='diseno') return header+renderDesignWorkbench(equipment,point);
+ if (tab==='simular') return header+renderInspectionWorkbench(equipment,point);
+ if (tab==='ficha') return header+equipmentProfile(equipment,status);
+ return header+scheduleSummary(equipment,result)+
+   '<div class="inspection-grid">'+pointMap(equipment)+pointCondition(point,status)+'</div>'+
+   '<div class="inspection-grid">'+thicknessChart(point)+trendPanel(equipment,point,status)+'</div>'+measurementHistory(point);
 }
-const metaLabels={tag:'TAG',name:'Nombre del equipo',plant:'Planta',area:'Área',system:'Sistema',component:'Componente',service:'Servicio',fluid:'Fluido',circuit:'Circuito',material:'Material',temp_c:'Temperatura de diseño (°C)',pressure_mpa:'Presión de diseño (MPa)',operating_temp_c:'Temperatura de operación (°C)',operating_pressure_mpa:'Presión de operación (MPa)',diameter_mm:'Diámetro (mm)',nominal_mm:'Espesor nominal (mm)',ca_mm:'Sobreespesor por corrosión (mm)',efficiency:'Eficiencia de junta',liquid_height_m:'Altura de líquido (m)',sg:'Gravedad específica'};
-function metaKeys(e){return Object.keys(metaLabels).filter(k=>e[k]!=null&&(e.family==='pipe'||k!=='circuit')&&(e.family==='tank'||!['liquid_height_m','sg'].includes(k)))}
-function equipmentTable(e){return '<div class="scroll"><table><tbody>'+metaKeys(e).map(k=>'<tr><th>'+esc(metaLabels[k])+'</th><td>'+esc(typeof e[k]==='number'?fmt(e[k],['efficiency','sg'].includes(k)?2:3):e[k])+'</td></tr>').join('')+'</tbody></table></div>'}
+
+function equipmentMeta(equipment) {
+ const rows=[
+   ['Material',equipment.material],['Código de diseño',designCodes[equipment.family]],
+   equipment.circuit?['Circuito',equipment.circuit]:['Servicio',equipment.service]
+ ];
+ return '<dl class="equipment-meta">'+rows.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>';
+}
+
+function pointMap(equipment) {
+ const drawing='<div class="drawing"><img src="'+esc(photo(equipment))+'" alt="'+esc('Esquema técnico de '+equipment.name)+'">'+
+   equipment.points.map((point,i)=>'<button type="button" class="pin '+(i===pointIndex?'active':'')+'" data-pin="'+i+
+     '" title="'+esc(point.id+' '+point.name)+'" aria-label="'+esc(point.id+' '+point.name)+'" aria-pressed="'+(i===pointIndex)+
+     '" style="left:'+point.x+'%;top:'+point.y+'%">'+(i+1)+'</button>').join('')+'</div>';
+ const links='<div class="tml-links" aria-label="Puntos de medición" role="group">'+equipment.points.map((point,i)=>
+   '<a href="'+esc(equipmentScreen(equipment,point))+'" aria-current="'+(i===pointIndex)+'">'+esc(point.id)+'</a>').join('')+'</div>';
+ return '<section class="panel">'+panelHeading('Ubicaciones de monitoreo','',action('＋ Punto','point'))+drawing+links+
+   '<div class="row map-footer"><small>CML identifica la ubicación. TML identifica el punto medido.</small>'+
+   action('Cambiar esquema','image')+'</div></section>';
+}
+
+function wallScale(s) {
+ const {current_mm:measured,minimum_mm:minimum,alert_mm:alert}=s;
+ if (!Number.isFinite(measured) || !Number.isFinite(minimum) || !Number.isFinite(alert) || minimum>=alert) return '';
+ const upper=Math.max(measured,alert)*1.12;
+ const stop=value=>100*value/upper+'%';
+ const label='Lectura '+fmt(measured,2)+' mm. Mínimo '+fmt(minimum,2)+' mm. Alerta '+fmt(alert,2)+' mm.';
+ return '<div class="wall-scale" role="img" aria-label="'+esc(label)+'" style="--min-stop:'+stop(minimum)+
+   ';--alert-stop:'+stop(alert)+';--reading-stop:'+stop(measured)+'"><span class="wall-marker"></span></div>';
+}
+
+function pointCondition(point,s) {
+ const label=[point.cml,point.id].filter(Boolean).join(' / ');
+ const warnings=s.warnings||[];
+ const trace=[s.governing,point.basis,...warnings].filter(Boolean).map(line=>'<p>'+esc(line)+'</p>').join('');
+ return '<section class="panel condition-panel"><div class="row"><span class="eyebrow">'+esc(label)+'</span>'+badge(s.status)+'</div>'+
+   '<h2 class="condition-title">'+esc(point.name)+'</h2>'+
+   '<div class="point-readout"><div><small>Espesor medido</small><strong>'+fmt(s.current_mm)+' <span class="unit">mm</span></strong>'+
+   (s.date?'<small>'+dateLabel(s.date)+'</small>':'')+'</div><div><small>Vida remanente</small><strong>'+fmt(s.life_years)+
+   ' <span class="unit">años</span></strong></div></div>'+
+   '<div class="metrics">'+metric('Mínimo en servicio',fmt(s.minimum_mm)+' mm')+metric('Alerta',fmt(s.alert_mm)+' mm')+'</div>'+
+   wallScale(s)+'<div class="point-date"><span class="muted">Próxima medición</span><strong>'+dateLabel(s.due)+'</strong></div>'+
+   (trace?'<details class="point-notes"'+(s.status!=='Normal'?' open':'')+
+     '><summary>Criterio y observaciones</summary><div class="note">'+trace+'</div></details>':'')+
+   '<div class="buttons monitor-actions"><button type="button" data-tab="simular" class="primary">Simular lectura</button>'+
+   action('Editar punto','editpoint')+'</div></section>';
+}
+
+function thicknessChart(point) {
+ return '<section class="panel"><div class="row chart-header"><div><h2>Evolución del espesor</h2>'+
+   '<p>Espesor en mm por fecha de campaña</p></div><span class="eyebrow">'+esc(point.id)+'</span></div>'+
+   '<canvas id="trend" class="plot" aria-label="Tendencia de espesor por fecha. Lecturas y unidades en el historial."></canvas>'+
+   '<div class="legend"><span><i></i>Medición</span><span class="projection"><i></i>Proyección hasta próxima fecha</span>'+
+   '<span class="threshold"><i></i>Alerta</span><span class="minimum"><i></i>Mínimo</span></div></section>';
+}
+
+function trendPanel(equipment,point,s) {
+ return '<section class="panel"><h2>Evaluación de la tendencia</h2><div class="metrics">'+
+   metric('Largo plazo',fmt(s.long_rate,3)+' mm/a')+metric('Corto plazo',fmt(s.short_rate,3)+' mm/a')+
+   metric('Tasa adoptada',fmt(s.rate,3)+' mm/a')+metric('Intervalo',fmt(s.interval_years)+' años')+'</div>'+
+   trendBasis(s)+timing(s)+pointEvidence(equipment,point,s)+'</section>';
+}
+
+function measurementHistory(point) {
+ const measurements=[...point.measurements].sort((a,b)=>b.date.localeCompare(a.date));
+ const rows=measurements.map(m=>'<tr><td class="table-number">'+dateLabel(m.date)+'</td>'+
+   '<td class="table-number align-right">'+fmt(m.thickness)+' '+esc(m.unit)+'</td>'+
+   '<td>'+esc(m.technique)+'</td><td class="table-number">'+esc(m.epoch??0)+'</td>'+
+   '<td>'+esc(m.notes)+(m.source?'<small class="source-origin">Fuente · '+esc(m.source)+'</small>':'')+revisionCell(m)+'</td>'+
+   '<td><button type="button" data-reading="'+esc(m.date)+'">Corregir</button></td></tr>').join('');
+ const table='<div class="scroll table-frame"><table class="data-table history-table"><thead><tr>'+
+   '<th scope="col">Fecha</th><th scope="col" class="align-right">Espesor</th><th scope="col">Técnica</th><th scope="col">Serie</th>'+
+   '<th scope="col">Observación</th><th scope="col">Acción</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+ return '<section class="panel history-panel">'+panelHeading('Historial de mediciones',
+   point.id+' · '+measurements.length+' '+(measurements.length===1?'lectura':'lecturas'))+
+   (measurements.length?table:'<p class="empty">Sin lecturas. Registra la primera medición para iniciar el historial.</p>')+'</section>';
+}
+
+const metaLabels={
+ tag:'TAG',name:'Nombre del equipo',plant:'Planta',area:'Área',system:'Sistema',component:'Componente',service:'Servicio',fluid:'Fluido',
+ circuit:'Circuito',material:'Material',temp_c:'Temperatura de diseño (°C)',pressure_mpa:'Presión de diseño (MPa)',
+ operating_temp_c:'Temperatura de operación (°C)',operating_pressure_mpa:'Presión de operación (MPa)',diameter_mm:'Diámetro (mm)',
+ nominal_mm:'Espesor nominal (mm)',ca_mm:'Sobreespesor por corrosión (mm)',efficiency:'Eficiencia de junta',
+ liquid_height_m:'Altura de líquido (m)',sg:'Gravedad específica'
+};
+
+function metaKeys(e) {
+ return Object.keys(metaLabels).filter(k=>e[k]!=null&&(e.family==='pipe'||k!=='circuit')&&
+   (e.family==='tank'||!['liquid_height_m','sg'].includes(k)));
+}
+
+function equipmentProfile(e, status) {
+ const permitted=metaKeys(e);
+ const group=(title,fields)=>'<section class="info-group"><h3>'+esc(title)+'</h3><dl>'+
+   fields.filter(k=>permitted.includes(k)).map(k=>{
+     const numeric=typeof e[k]==='number';
+     const value=numeric?fmt(e[k],['efficiency','sg'].includes(k)?2:3):e[k];
+     return '<div class="info-pair"><dt>'+esc(metaLabels[k])+'</dt><dd'+(numeric?' class="mono"':'')+'>'+esc(value)+'</dd></div>';
+   }).join('')+'</dl></section>';
+ return '<section class="panel"><h2>Antecedentes del activo</h2><div class="info-grid"><div class="info-column">'+
+   group('Identificación',['tag','name','component','service','fluid'])+
+   group('Ubicación técnica',['plant','area','system','circuit'])+'</div><div class="info-column">'+
+   group('Diseño',['material','diameter_mm','nominal_mm','ca_mm','efficiency','temp_c','pressure_mpa','liquid_height_m','sg'])+
+   group('Operación',['operating_temp_c','operating_pressure_mpa'])+'</div></div>'+
+   '<div class="note"><p><strong>Diseño</strong> · '+esc(status.design.reference)+'</p>'+
+   '<p><strong>Inspección en servicio</strong> · '+esc(status.reference)+'</p></div></section>';
+}
+
 const defaultCostBasis='Valoración ficticia en CLP de noviembre de 2026';

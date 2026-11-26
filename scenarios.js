@@ -34,7 +34,8 @@ function scenarioNumbers(form, definitions) {
 function comparisonItem(label, current, base, unit, digits) {
   const display = n => Number.isFinite(n) ? fmt(n,digits) + (unit?' '+unit:'') : '—';
   const delta = Number.isFinite(current) && Number.isFinite(base) ? current-base : null;
-  return '<div class="live-metric"><span>'+esc(label)+'</span><strong>'+esc(display(current))+'</strong>'+
+  const readout=Number.isFinite(current)?esc(fmt(current,digits))+(unit?' <span class="result-unit">'+esc(unit)+'</span>':''):'—';
+  return '<div class="live-metric"><span>'+esc(label)+'</span><strong>'+readout+'</strong>'+
     '<small>Base '+esc(display(base))+
     (delta!==null && Math.abs(delta)>=0.5*10**(-digits) ? ' <span class="delta">'+(delta>0?'+':'−')+esc(display(Math.abs(delta)))+'</span>':'')+'</small></div>';
 }
@@ -210,4 +211,3 @@ function renderInspectionResult(result, saved, dirty) {
     '<p class="muted result-context">'+esc(result.governing)+'</p>'+
     (result.warnings.length?'<div class="note">'+result.warnings.map(s=>'<p>'+esc(s)+'</p>').join('')+'</div>':'');
 }
-

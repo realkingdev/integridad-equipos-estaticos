@@ -14,7 +14,7 @@ function drawTrend() {
   const ctx = canvas.getContext('2d');
   ctx.scale(ratio, ratio);
   ctx.font = '11px Segoe UI, sans-serif';
-  ctx.fillStyle = '#516662';
+  ctx.fillStyle = '#496675';
   if (!history.length) {
     ctx.fillText('El gráfico aparecerá al registrar una medición.', 10, 50);
     return;
@@ -45,10 +45,10 @@ function drawTrend() {
   ctx.textAlign = 'right';
   for (let i=0;i<=4;i++) {
     const value=y1+(y2-y1)*(i/4);
-    line([[left,y(value)],[right,y(value)]],'#e2e9e5');
+    line([[left,y(value)],[right,y(value)]],'#dfe8ee');
     ctx.fillText(fmt(value,1),left-7,y(value)+4);
   }
-  for (const [value,color] of [[state.minimum_mm,'#a74937'],[state.alert_mm,'#ad751b']]) {
+  for (const [value,color] of [[state.minimum_mm,'#a54035'],[state.alert_mm,'#9f650f']]) {
     line([[left,y(value)],[right,y(value)]],color,1.4,[4,4]);
   }
   const dates = projectTrend ? [...history,{date:state.due,time:due}] : history;
@@ -64,11 +64,11 @@ function drawTrend() {
   });
   history.forEach((m,i) => {
     const previous = history[i-1];
-    if(previous?.epoch===m.epoch)line([[x(previous.time),y(previous.value)],[x(m.time),y(m.value)]],'#11675e',2.7);
+    if(previous?.epoch===m.epoch)line([[x(previous.time),y(previous.value)],[x(m.time),y(m.value)]],'#156b78',2.7);
   });
-  if(projectTrend)line([[x(latest.time),y(latest.value)],[x(due),y(estimate)]],'#11675e',2,[6,5]);
+  if(projectTrend)line([[x(latest.time),y(latest.value)],[x(due),y(estimate)]],'#156b78',2,[6,5]);
   history.forEach(m => {
-    ctx.fillStyle='#11675e';
+    ctx.fillStyle='#156b78';
     ctx.beginPath();
     ctx.arc(x(m.time),y(m.value),4,0,Math.PI*2);
     ctx.fill();
