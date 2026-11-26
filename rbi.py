@@ -66,9 +66,14 @@ def rbi(case):
     frequency = gff * df * fms
     area_risk, cost_risk = frequency * values["area"], frequency * values["cost"]
     # Umbrales de priorización del ejercicio, por m²/año y CLP/año.
-    score = max(area_risk / 1.0, cost_risk / 100000.0)
-    priority = "Alta" if score >= 1 else "Media" if score >= 0.1 else "Baja"
+    def level(score):
+        return "Alta" if score >= 1 else "Media" if score >= 0.1 else "Baja"
+
+    area_score = area_risk
+    cost_score = cost_risk / 100000.0
+    priority = level(max(area_score, cost_score))
     return dict(art=art, flow=flow, strength_ratio=strength_ratio, posterior=posterior,
                 beta=beta, base_df=base, df=df, frequency=frequency, gff=gff, fms=fms,
                 area_risk=area_risk, cost_risk=cost_risk, priority=priority,
+                area_priority=level(area_score), cost_priority=level(cost_score),
                 wall_at_horizon=values["thickness"] * (1 - art))

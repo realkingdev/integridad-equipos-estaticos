@@ -94,12 +94,19 @@ def design(eq, point=None):
 
 def inspect_point(point, eq, calc, today):
     kind,ref,cap=INSPECTION[eq["family"]]
-    minimum=max(calc["pressure_mm"],number(point["minimum_mm"],"mínimo documentado",.001))
+    documented = number(point["minimum_mm"], "mínimo documentado", .001)
+    geometry = point.get("geometry", "accessory" if eq["family"] == "pipe" and "codo" in point["name"].lower() else "supported")
+    localized_design = not (eq["family"] == "pipe" and geometry == "accessory")
+    minimum = max(calc["pressure_mm"], documented) if localized_design else documented
     alert=number(point["alert_mm"],"espesor de alerta",.001)
     out=dict(id=point["id"],status="Información insuficiente",date=None,current_mm=None,
              minimum_mm=minimum,alert_mm=alert,short_rate=None,long_rate=None,rate=None,
              life_years=None,due=None,interval_years=None,governing="Revisar historial",
+             cap_years=cap,half_life_years=None,alert_years=None,
+             series_start=None, previous_date=None, rate_basis=None,
              inspection_type=kind,reference=ref,warnings=[],overdue=False,design=calc)
+    if not localized_design:
+        out["warnings"].append("Accesorio: la evaluación usa el mínimo documentado del punto. El cálculo de tramo recto se muestra como referencia del equipo.")
     rows=[]
     for m in point["measurements"]:
         if m.get("unit","mm") not in ("mm","in"):
@@ -133,6 +140,7 @@ def inspect_point(point, eq, calc, today):
     if len(rows)<2:
         out["warnings"].append("Se requieren dos mediciones comparables.")
         return out
+    out.update(series_start=rows[0][0].isoformat(), previous_date=rows[-2][0].isoformat())
     candidates=[]
     for key,r in [("long_rate",rows[0]),("short_rate",rows[-2])]:
         rate=(r[1]-value)/years_between(r[0],latest)
@@ -147,8 +155,16 @@ def inspect_point(point, eq, calc, today):
     if not candidates:
         return out
     rate=max(candidates)
+    if out["short_rate"] == out["long_rate"]:
+        basis = "Coinciden las tasas de corto y largo plazo."
+    elif out["short_rate"] == rate:
+        basis = "Se adopta la tasa de corto plazo porque es la mayor tasa positiva comparable."
+    else:
+        basis = "Se adopta la tasa de largo plazo porque es la mayor tasa positiva comparable."
+    out["rate_basis"] = basis
     life=max(0,(value-minimum)/rate)
-    out.update(rate=rate,life_years=life)
+    out.update(rate=rate, life_years=life, half_life_years=life/2,
+               alert_years=max(0,(value-alert)/rate))
     if value<=max(minimum,alert):
         return out
     interval,rule=min([(life/2,"Mitad de vida remanente"),(cap,"Tope de familia"),((value-alert)/rate,"Proyección al espesor de alerta")])
@@ -164,10 +180,13 @@ def evaluate(equipment,today=None):
     points=[inspect_point(pt,equipment,design(equipment,pt),today) for pt in equipment["points"]]
     if len({pt["id"] for pt in points})!=len(points):
         raise ValueError("Identificador de TML repetido.")
+    for point in points:
+        point["overdue"] = bool(point["due"] and point["due"] < today.isoformat())
     dated=[pt for pt in points if pt["due"]]
     first=min(dated,key=lambda pt: (pt["due"],-STATUS.index(pt["status"]))) if dated else {}
     status=max((pt["status"] for pt in points),key=STATUS.index,default="Información insuficiente")
-    return dict(design=base,points=points,due=first.get("due"),status=status,governing=first.get("id","—"))
+    return dict(design=base,points=points,due=first.get("due"),status=status,governing=first.get("id","—"),
+                overdue=any(point["overdue"] for point in points))
 
 def demo_equipment():
     """Planta ficticia. Los umbrales de servicio son supuestos de los casos."""

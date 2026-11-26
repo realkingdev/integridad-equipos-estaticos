@@ -2,6 +2,10 @@ function scheduleSummary(e,r){
  const p=r.points.find(p=>p.id===r.governing);
  return '<div class="panel row"><div><div class="eyebrow">PLAN DEL EQUIPO</div><strong>'+esc(r.governing)+' · '+dateLabel(r.due)+'</strong><p class="muted">'+esc(p?.governing||'Revisar antecedentes pendientes')+'</p></div>'+badge(r.status)+'</div>'
 }
+function designPointChooser(e,index) {
+ const locations=e.points.map((p,i)=>[i,p.id+' · '+p.name]);
+ return '<label class="design-location">Ubicación de evaluación <select id="designPoint">'+opts(locations,index)+'</select></label>';
+}
 function designComment(e,p,d){
  const target=e.family==='pipe'?d.required_mm/.875:d.required_mm;
  const compare=e.nominal_mm>=target?'El nominal registrado cubre el requisito mostrado.':'El nominal registrado queda por debajo del requisito mostrado.';

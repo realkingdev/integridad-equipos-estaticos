@@ -20,6 +20,21 @@ class EngineeringTests(unittest.TestCase):
         self.assertAlmostEqual(b["short_rate"],.30)
         self.assertEqual(a["due"],"2028-06-01")
 
+    def test_accessory_uses_documented_service_minimum(self):
+        self.pipe["pressure_mpa"] = 10
+        result = evaluate(self.pipe, TODAY)
+        straight, elbow, _ = result["points"]
+        self.assertGreater(straight["minimum_mm"], 3.0)
+        self.assertEqual(elbow["minimum_mm"], 3.0)
+        self.assertEqual(elbow["due"], "2027-10-01")
+        self.assertTrue(any("Accesorio" in warning for warning in elbow["warnings"]))
+
+    def test_alert_keeps_wall_condition_and_flags_past_due(self):
+        result = evaluate(self.vessel, TODAY)
+        point = result["points"][1]
+        self.assertEqual(point["status"], "Alerta")
+        self.assertTrue(point["overdue"])
+
     def test_vessel(self):
         result=evaluate(self.vessel,TODAY)
         self.assertAlmostEqual(result["design"]["required_mm"]/25.4,.4613367262)
