@@ -2,9 +2,9 @@
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const family={pipe:'Tubería',vessel:'Recipiente',tank:'Tanque'};
-const navNames={inicio:'Vista general',equipos:'Registro de equipos',agenda:'Inspecciones',riesgo:'Análisis RBI'};
+const navNames={inicio:'Vista general',equipos:'Registro de equipos',agenda:'Inspecciones',riesgo:'Análisis RBI',fuentes:'Fuentes de datos',asistente:'Asistente'};
 const key='estrato-project-v1';
-let py, project, analysis=[], tab='monitoreo', pointIndex=0, currentId='', template, filter='', familyFilter='', statusFilter='', saveForm, assessmentDate='', initialCase;
+let py, project, analysis=[], tab='monitoreo', pointIndex=0, currentId='', template, filter='', familyFilter='', statusFilter='', saveForm, assessmentDate='', initialCase, storedCase;
 const fmt=(n,d=2)=>Number.isFinite(n)?n.toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
 const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
 const dateLabel=s=>s?s.split('-').reverse().join('/'):'Por determinar';
@@ -46,8 +46,10 @@ function evaluateAll(p){
 }
 function commit(change){
  const copy=structuredClone(project);change(copy);const result=evaluateAll(copy);
- try{localStorage.setItem(key,JSON.stringify(copy))}catch{throw Error('No se pudo guardar en el navegador. Reduzca el tamaño de la imagen o exporte el caso.')}
- project=copy;analysis=result;$('saved').textContent='Guardado en este navegador';render()
+ if(localStorage.getItem(key)!==storedCase)throw Error('El caso cambió en otra pestaña. Recarga la aplicación para abrir la versión guardada.');
+ const serialized=JSON.stringify(copy);
+ try{localStorage.setItem(key,serialized)}catch{throw Error('No se pudo guardar en el navegador. Reduzca el tamaño de la imagen o exporte el caso.')}
+ storedCase=serialized;project=copy;analysis=result;$('saved').textContent='Guardado en este navegador';render()
 }
 function dialog(title,body,callback,submit='Guardar'){
  $('fields').innerHTML='<h2>'+esc(title)+'</h2><div class="gridform">'+body+'</div>';$('error').textContent='';$('submit').textContent=submit;saveForm=callback;$('modal').showModal()
@@ -57,7 +59,10 @@ $('form').onsubmit=async e=>{e.preventDefault();$('submit').disabled=true;try{aw
 const field=(name,label,value,type='text',attrs='required')=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${type==='number'?'step="any"':''} ${attrs}></label>`;
 const opts=(values,selected)=>values.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(selected)?'selected':''}>${esc(l)}</option>`).join('');
 const select=(name,label,list,value)=>`<label>${esc(label)}<select name="${name}">${opts(list,value)}</select></label>`;
-function route(){const [name,id]=location.hash.slice(1).split('/');try{return [name||'inicio',id?decodeURIComponent(id):'']}catch{return ['equipos','']}}
+function route(){
+ const [name,id,point='',view='']=location.hash.slice(1).split('/');
+ try{return [name||'inicio',id?decodeURIComponent(id):'',decodeURIComponent(point),view]}catch{return ['equipos','']}
+}
 function current(){const [,id]=route();const i=project.equipment.findIndex(e=>e.tag===id);return [project.equipment[i],analysis[i],i]}
 function cards(list){return '<div class="assets">'+list.map(([e,r])=>`<a class="card" href="${esc(link(e))}"><img src="${esc(photo(e))}" alt="Esquema de ${esc(e.tag)}"><div class="cardbody"><div class="row"><span class="mono">${esc(e.tag)}</span>${badge(r.status)}</div><h3>${esc(e.name)}</h3><small>${esc(family[e.family])} · ${e.points.length} ubicaciones</small><div class="card-meta"><span>Próxima medición</span><strong>${dateLabel(r.due)}</strong></div></div></a>`).join('')+'</div>'}
 function schedule(rows){return '<div class="scroll"><table><thead><tr><th>Equipo / punto</th><th>Componente</th><th>Condición</th><th>Próxima medición</th><th>Criterio gobernante</th></tr></thead><tbody>'+rows.map(({e,p,r})=>`<tr><td><a href="${esc(link(e))}" data-point="${esc(p.id)}">${esc(e.tag)} · ${esc(p.id)}</a></td><td>${esc(p.name)}</td><td>${badge(r.status)}${r.overdue && r.status!=='Inspección vencida'?'<small class="overdue-text">Fecha vencida</small>':''}</td><td>${dateLabel(r.due)}</td><td>${esc(r.governing||'Revisar historial')}</td></tr>`).join('')+'</tbody></table></div>'}

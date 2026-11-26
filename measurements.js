@@ -1,3 +1,8 @@
+function withMeasurementRevision(original, updated, reason) {
+  const {revisions = [], ...previous} = original;
+  return {...updated,revisions:[...revisions,{date:today(),reason,previous}]};
+}
+
 function measure(equipmentIndex, locationIndex, originalDate) {
   const equipment = project.equipment[equipmentIndex];
   const point = equipment.points[locationIndex];
@@ -40,8 +45,7 @@ function measure(equipmentIndex, locationIndex, originalDate) {
       if (editing) {
         const reason = form.get('reason').trim();
         if (!reason) throw Error('Describe el motivo de la corrección.');
-        const {revisions = [], ...snapshot} = original;
-        reading.revisions = [...revisions, {date:today(), reason, previous:snapshot}];
+        Object.assign(reading,withMeasurementRevision(original,reading,reason));
       }
       commit(draft => {
         const readings = draft.equipment[equipmentIndex].points[locationIndex].measurements;

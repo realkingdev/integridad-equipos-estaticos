@@ -5,7 +5,8 @@ function render(){
   a.classList.toggle('on',active);
   if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
  });
- $('app').innerHTML=name==='equipo'?detail():name==='riesgo'?riskPage():['equipos','agenda'].includes(name)?listPage(name):overview()+validationPanel();
+ $('app').innerHTML=name==='equipo'?detail():name==='riesgo'?renderRbiWorkbench():name==='fuentes'?sourcePage():name==='asistente'?renderAssistant():['equipos','agenda'].includes(name)?listPage(name):overview()+validationPanel();
+ initializeScenario();
  drawTrend()
 }
 function editAsset(index,newFamily){
@@ -52,12 +53,6 @@ function handleAction(act){
  if(act==='csv')return csvExport();
  if(act==='reset'){dialog('Recuperar demostración','<p class="wide">Se reemplazará el contenido guardado por el caso académico original. Exporta una copia desde el registro si necesitas conservar tus cambios.</p>',()=>{commit(p=>Object.assign(p,structuredClone(initialCase)));notify('Caso original recuperado')},'Recuperar');return}
  if(act==='import'){$('restore').click();return}
- if(act==='riskEdit'){
-  const numbers=Object.keys(rbiLabels).map(k=>field(k,rbiLabels[k],project.rbi[k],'number','required min="0"')).join('');
-  dialog('Editar escenario RBI',numbers+field('costBasis','Base de valoración en CLP',project.rbi.costBasis||defaultCostBasis,'text','required maxlength="180"'),
-   f=>commit(p=>{for(const k of Object.keys(rbiLabels))p.rbi[k]=Number(f.get(k));p.rbi.costBasis=f.get('costBasis').trim()}));
-  return
- }
  if(act==='new'){dialog('Familia del equipo',select('family','Familia',Object.entries(family),'pipe'),f=>setTimeout(()=>editAsset(-1,f.get('family')),0),'Continuar');return}
  if(act==='measureAny')return chooseMeasurement();
  if(!e)return;
@@ -85,20 +80,30 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('input',ev=>{if(ev.target.id==='filter'){filter=ev.target.value;render();$('filter').focus();$('filter').setSelectionRange(filter.length,filter.length)}});
 document.addEventListener('change',ev=>{if(ev.target.id==='designPoint'){pointIndex=Number(ev.target.value);render();$('designPoint').focus();return}if(ev.target.id==='assessment')return dueDate(ev.target.value);if(ev.target.id==='familyFilter'){familyFilter=ev.target.value;render()}if(ev.target.id==='statusFilter'){statusFilter=ev.target.value;render()}});
-window.addEventListener('hashchange',()=>{if(project){render();scrollTo(0,0)}});
+function activateDeepLink(){
+ const [name,id,point,view]=route();
+ if (name!=='equipo') return;
+ const equipment=project.equipment.find(e=>e.tag===id);
+ if (!equipment || (!point && !view)) return;
+ currentId=id;
+ const index=equipment.points.findIndex(p=>p.id===point);
+ pointIndex=Math.max(0,index);
+ tab=['monitoreo','diseno','simular','ficha','documentos'].includes(view)?view:'monitoreo';
+}
+window.addEventListener('hashchange',()=>{if(project){activateDeepLink();render();scrollTo(0,0)}});
 window.addEventListener('resize',()=>{if(project)drawTrend()});
 async function start(){
  try{
  py=await loadPyodide({indexURL:new URL('runtime/',document.baseURI).href});
- for(const name of ['engineering','rbi']){const res=await fetch('./'+name+'.py?v=2');if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
- py.runPython('import json\nfrom engineering import demo_equipment, evaluate\nfrom rbi import rbi as _risk, DEFAULTS\ndef _evaluate(obj): return evaluate(obj, _today)');
+ for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v=3');if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
+ py.runPython('import json\nfrom engineering import demo_equipment, evaluate\nfrom rbi import rbi as _risk, DEFAULTS\nfrom data_import import read_measurements_csv as _read_csv, read_measurements_sqlite as _read_sqlite\ndef _evaluate(obj): return evaluate(obj, _today)\ndef _simulate(obj): return evaluate(obj[\'equipment\'], max(_today, obj[\'date\']))');
  py.globals.set('_today',today());template=JSON.parse(py.runPython('json.dumps(demo_equipment())'));
  const coords={pipe:[[27.5,48.6],[36.9,49.3],[74.6,44.2]],vessel:[[27.1,43.1],[44.5,51.3],[62.1,51.5]],tank:[[41,75.2],[45.6,59.2],[50.5,40.9]]};
  template.forEach(e=>e.points.forEach((p,i)=>{[p.x,p.y]=coords[e.family][i];p.cml='CML-0'+(i+1);p.basis='Mínimo del expediente académico; alerta con margen de '+fmt(p.alert_mm-p.minimum_mm)+' mm para intervención.'}));
  const defaultCase={version:1,equipment:structuredClone(template),rbi:{...JSON.parse(py.runPython('json.dumps(DEFAULTS)')),costBasis:defaultCostBasis}};
- initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);
+ initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);storedCase=raw;
  if(raw){try{const temp=JSON.parse(raw);analysis=evaluateAll(temp);project=temp;$('saved').textContent='Caso recuperado'}catch{notify('Respaldo local incompatible. Se muestra el caso de demostración.')}}
- render()
+ activateDeepLink();render()
  }catch(err){$('app').innerHTML='<h1>No se pudo abrir la aplicación</h1><p>'+esc(message(err))+'</p><p>Abra el enlace publicado o inicie el servidor local desde la carpeta del proyecto.</p>'}
 }
 start();
