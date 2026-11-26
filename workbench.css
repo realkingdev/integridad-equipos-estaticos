@@ -108,10 +108,10 @@
 
 .mobile-result {display:none;}
 @media(min-width:896px) {
-  .scenario-result {position:sticky;top:14px;}
+  .scenario-result {position:sticky;top:calc(var(--header-height) + 14px);}
 }
 @media(max-width:895px) {
-  .mobile-result {display:block;position:sticky;top:0;z-index:4;order:-2;padding:9px 13px;border:1px solid #ceead8;background:#e5f3e9;color:#184b3c;border-radius:7px;font:650 13px/1.35 'Segoe UI',sans-serif;}
+  .mobile-result {display:block;position:sticky;top:var(--header-height);z-index:4;order:-2;padding:9px 13px;border:1px solid #ceead8;background:#e5f3e9;color:#184b3c;border-radius:7px;font:650 13px/1.35 'Segoe UI',sans-serif;}
   .scenario-result {order:0;}
 }
 
@@ -127,7 +127,8 @@
 .slot-letter {display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:#266652;color:#fff;font-weight:700;}
 .compare-slot .buttons {margin-left:auto;justify-content:flex-start;gap:5px}
 .compare-slot button {font-size:12px;padding:6px 9px;}
-.comparison-panel {margin-bottom:22px;scroll-margin-top:15px;}
+.comparison-panel {margin-bottom:22px;}
+.comparison-panel, .scenario-form {scroll-margin-top:calc(var(--header-height) + 15px);}
 .comparison-panel table td,.evidence table td {font-variant-numeric:tabular-nums;}
 .comparison-panel table th {white-space:normal;}
 .evidence {margin:15px 0 3px;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:#f7faf8;}

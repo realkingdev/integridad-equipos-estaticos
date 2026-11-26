@@ -3,8 +3,8 @@ function detail(){
  if(currentId!==e.tag){currentId=e.tag;pointIndex=0;tab='monitoreo'}pointIndex=Math.min(pointIndex,e.points.length-1);
  const p=e.points[pointIndex],s=r.points[pointIndex];
  const drawing=`<div class="drawing"><img src="${esc(photo(e))}" alt="Esquema técnico de ${esc(e.name)}">${e.points.map((pt,i)=>`<button class="pin ${i===pointIndex?'active':''}" data-pin="${i}" title="${esc(pt.id+' '+pt.name)}" aria-label="${esc(pt.id+' '+pt.name)}" style="left:${pt.x}%;top:${pt.y}%">${i+1}</button>`).join('')}</div>`;
- const intro='<a class="back" href="#equipos">← Registro de equipos</a>'+hero(e.tag+' / '+family[e.family],e.name,[e.plant,e.area,e.system].join(' · '),action('Editar equipo','edit')+action('＋ Medición','measure',true))+
- '<div class="tabs">'+[['monitoreo','Monitoreo'],['diseno','Cálculo de diseño'],['simular','Simular lectura'],['ficha','Ficha técnica'],['documentos','Documentos']].map(([k,v])=>`<button data-tab="${k}" class="${tab===k?'active':''}">${v}</button>`).join('')+'</div>';
+ const intro='<a class="back" href="#equipos">Registro de equipos</a>'+hero(e.tag+' / '+family[e.family],e.name,[e.plant,e.area,e.system].join(' · '),action('Editar equipo','edit')+action('＋ Medición','measure',true))+
+ '<div class="tabs">'+Object.entries(equipmentTabs).map(([k,v])=>`<button type="button" data-tab="${k}" class="${tab===k?'active':''}" aria-current="${tab===k?'page':'false'}">${v}</button>`).join('')+'</div>';
  const trace=arr=>'<div class="note">'+arr.filter(Boolean).map(a=>'<p>'+esc(a)+'</p>').join('')+'</div>';
  if(tab==='documentos')return intro+documentPanel(e);
  if(tab==='diseno')return intro+renderDesignWorkbench(e,p);

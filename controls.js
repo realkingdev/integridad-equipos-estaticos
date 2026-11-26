@@ -1,5 +1,5 @@
 function render(){
- const [name]=route();$('crumb').textContent=name==='equipo'?'Ficha de equipo':navNames[name]||navNames.inicio;
+ const [name]=route();$('crumb').textContent=screenTitle();updateBackButton();
  document.querySelectorAll('#nav a').forEach(a=>{
   const active=a.hash==='#'+(name==='equipo'?'equipos':name);
   a.classList.toggle('on',active);
@@ -11,6 +11,7 @@ function render(){
 }
 function editAsset(index,newFamily){
  const isNew=index<0,e=structuredClone(isNew?template.find(e=>e.family===newFamily):project.equipment[index]);
+ const projectTag=e.tag;
  if(isNew){e.tag='';e.name='';e.points=e.points.slice(0,1);e.points[0].measurements=[];e.points[0].x=50;e.points[0].y=50;e.points[0].basis='Definir fuente del mínimo y criterio de alerta'}
  const fields=metaKeys(e).map(k=>{
  let name=metaLabels[k];
@@ -19,7 +20,10 @@ function editAsset(index,newFamily){
  return field(k,name,e[k],typeof e[k]==='number'?'number':'text',(k==='material'||(e.family==='tank'&&k.includes('pressure')))?'readonly':'required')}).join('');
  dialog(isNew?'Crear '+family[e.family].toLowerCase():'Editar '+e.tag,fields,f=>{
  for(const k of metaKeys(e))e[k]=typeof e[k]==='number'?Number(f.get(k)):String(f.get(k)).trim();
- commit(p=>{if(isNew)p.equipment.push(e);else p.equipment[index]=e});location.hash=link(e);notify('Equipo guardado')
+ commit(p=>{if(isNew)p.equipment.push(e);else p.equipment[index]=e});
+ if(isNew) navigate(link(e));
+ else if(e.tag!==projectTag) navigate(equipmentScreen(e,e.points[pointIndex],tab),{replace:true,keepScroll:true});
+ notify('Equipo guardado')
  })
 }
 function chooseMeasurement(){
@@ -40,7 +44,8 @@ function pointForm(i,j){
    auditThresholds(pts[j],p.minimum_mm,p.alert_mm,p.basis);
    pts[j]={...p,thresholdHistory:pts[j].thresholdHistory};
  }});
- pointIndex=isNew?e.points.length:j;render()
+ if(isNew) navigate(equipmentScreen(e,p));
+ else if(e.points[j].id!==p.id) navigate(equipmentScreen(e,p,tab),{replace:true,keepScroll:true});
  });
  selectMarkerPosition(photo(e),p)
 }
@@ -68,34 +73,53 @@ function handleAction(act){
 $('restore').onchange=async ev=>{
  const file=ev.target.files[0];ev.target.value='';if(!file)return;
  try{if(file.size>10000000)throw Error('El proyecto supera 10 MB.');const data=JSON.parse(await file.text());evaluateAll(data);
- dialog('Recuperar proyecto','<p class="wide">El archivo contiene '+data.equipment.length+' equipos. Al recuperar el caso se reemplazarán los datos guardados en este navegador.</p>',()=>{commit(pr=>{Object.assign(pr,data);pr.comparisons=data.comparisons??[]});location.hash='#equipos';notify('Proyecto recuperado')},'Recuperar')
+ dialog('Recuperar proyecto','<p class="wide">El archivo contiene '+data.equipment.length+' equipos. Al recuperar el caso se reemplazarán los datos guardados en este navegador.</p>',()=>{commit(pr=>{Object.assign(pr,data);pr.comparisons=data.comparisons??[]});navigate('#equipos');notify('Proyecto recuperado')},'Recuperar')
  }catch(err){notify(message(err))}
 };
 document.addEventListener('click',event=>{
- const a=event.target.closest('[data-act],[data-tab],[data-pin],[data-point],[data-status],[data-reading],[data-doc]');if(!a||!project)return;
- if(a.dataset.status){filter='';familyFilter='';scheduleDays=0;scheduleTag='';statusFilter=a.dataset.status;if(location.hash==='#agenda')render();else location.hash='#agenda';return}
+ const a=event.target.closest('[data-act],[data-tab],[data-pin],[data-status],[data-reading],[data-doc]');if(!a||!project)return;
+ if(a.dataset.status) return navigate('#agenda',{filters:{statusFilter:a.dataset.status}});
  if(a.dataset.reading){const [,,i]=current();return measure(i,pointIndex,a.dataset.reading)}
  if(a.dataset.doc!==undefined)return openDocument(Number(a.dataset.doc));
  if(a.dataset.act){handleAction(a.dataset.act);return}
- if(a.dataset.tab){tab=a.dataset.tab;render();return}
- if(a.dataset.pin!==undefined){pointIndex=Number(a.dataset.pin);render();return}
- if(a.dataset.point){const tag=decodeURIComponent(a.hash.slice(8));const e=project.equipment.find(e=>e.tag===tag);if(e){currentId=tag;tab='monitoreo';pointIndex=e.points.findIndex(p=>p.id===a.dataset.point);if(location.hash===a.hash)render()}}
+ if(a.dataset.tab||a.dataset.pin!==undefined){
+  const [equipment]=current();
+  const point=equipment?.points[a.dataset.pin===undefined?pointIndex:Number(a.dataset.pin)];
+  if(equipment&&point) openEquipmentScreen(equipment,point,a.dataset.tab||tab,{keepScroll:a.dataset.pin!==undefined});
+ }
 });
 document.addEventListener('input',ev=>{if(ev.target.id==='filter'){scheduleTag='';filter=ev.target.value;render();$('filter').focus();$('filter').setSelectionRange(filter.length,filter.length)}});
-document.addEventListener('change',ev=>{if(ev.target.id==='designPoint'){pointIndex=Number(ev.target.value);render();$('designPoint').focus();return}if(ev.target.id==='assessment')return dueDate(ev.target.value);if(ev.target.id==='familyFilter'){familyFilter=ev.target.value;render()}if(ev.target.id==='statusFilter'){statusFilter=ev.target.value;render()}});
+document.addEventListener('change', event => {
+ const {id,value}=event.target;
+ if(id==='designPoint'){
+  const [equipment]=current();
+  const point=equipment?.points[Number(value)];
+  if(point) openEquipmentScreen(equipment,point,'diseno',{keepScroll:true});
+  $('designPoint')?.focus();
+  return;
+ }
+ if(id==='assessment') return dueDate(value);
+ if(id==='familyFilter'){
+  familyFilter=value;
+  render();
+ }
+ if(id==='statusFilter'){
+  statusFilter=value;
+  render();
+ }
+});
 function activateDeepLink(){
  const routeInfo=route();
  activateAssistantRoute(routeInfo);
  const [name,id,point,view]=routeInfo;
  if (name!=='equipo') return;
  const equipment=project.equipment.find(e=>e.tag===id);
- if (!equipment || (!point && !view)) return;
+ if (!equipment) return;
  currentId=id;
  const index=equipment.points.findIndex(p=>p.id===point);
  pointIndex=Math.max(0,index);
- tab=['monitoreo','diseno','simular','ficha','documentos'].includes(view)?view:'monitoreo';
+ tab=Object.hasOwn(equipmentTabs,view)?view:'monitoreo';
 }
-window.addEventListener('hashchange',()=>{if(project){activateDeepLink();render();scrollTo(0,0)}});
 window.addEventListener('resize',()=>{if(project)drawTrend()});
 async function start(){
  try{
@@ -108,7 +132,7 @@ async function start(){
  const defaultCase={version:1,equipment:structuredClone(template),rbi:{...JSON.parse(py.runPython('json.dumps(DEFAULTS)')),costBasis:defaultCostBasis}};
  defaultCase.comparisons=[];initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);storedCase=raw;
  if(raw){try{const temp=JSON.parse(raw);analysis=evaluateAll(temp);project=temp;$('saved').textContent='Caso recuperado'}catch{notify('Respaldo local incompatible. Se muestra el caso de demostración.')}}
- activateDeepLink();render()
+ startNavigation()
  }catch(err){$('app').innerHTML='<h1>No se pudo abrir la aplicación</h1><p>'+esc(message(err))+'</p><p>Abra el enlace publicado o inicie el servidor local desde la carpeta del proyecto.</p>'}
 }
 start();

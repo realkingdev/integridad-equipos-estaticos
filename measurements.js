@@ -52,11 +52,7 @@ function measure(equipmentIndex, locationIndex, originalDate) {
         if (editing) readings.splice(readings.findIndex(m => m.date === originalDate), 1, reading);
         else readings.push(reading);
       });
-      currentId = equipment.tag;
-      tab = 'monitoreo';
-      pointIndex = locationIndex;
-      if (location.hash !== link(equipment)) location.hash = link(equipment);
-      render();
+      openEquipmentScreen(equipment, point, 'monitoreo');
       notify(editing ? 'Corrección guardada con trazabilidad' : 'Medición guardada y evaluación actualizada');
     });
 }

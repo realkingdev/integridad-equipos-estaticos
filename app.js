@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const family={pipe:'Tubería',vessel:'Recipiente',tank:'Tanque'};
 const navNames={inicio:'Vista general',equipos:'Registro de equipos',agenda:'Inspecciones',riesgo:'Análisis RBI',fuentes:'Fuentes de datos',asistente:'Asistente'};
+const equipmentTabs={monitoreo:'Monitoreo',diseno:'Cálculo de diseño',simular:'Simular lectura',ficha:'Ficha técnica',documentos:'Documentos'};
 const key='estrato-project-v1';
 let py, project, analysis=[], tab='monitoreo', pointIndex=0, currentId='', template, filter='', familyFilter='', statusFilter='', saveForm, assessmentDate='', initialCase, storedCase;
 const fmt=(n,d=2)=>Number.isFinite(n)?n.toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
@@ -65,7 +66,7 @@ function route(){
 }
 function current(){const [,id]=route();const i=project.equipment.findIndex(e=>e.tag===id);return [project.equipment[i],analysis[i],i]}
 function cards(list){return '<div class="assets">'+list.map(([e,r])=>`<a class="card" href="${esc(link(e))}"><img src="${esc(photo(e))}" alt="Esquema de ${esc(e.tag)}"><div class="cardbody"><div class="row"><span class="mono">${esc(e.tag)}</span>${badge(r.status)}</div><h3>${esc(e.name)}</h3><small>${esc(family[e.family])} · ${e.points.length} ubicaciones</small><div class="card-meta"><span>Próxima medición</span><strong>${dateLabel(r.due)}</strong></div></div></a>`).join('')+'</div>'}
-function schedule(rows){return '<div class="scroll"><table><thead><tr><th>Equipo / punto</th><th>Componente</th><th>Condición</th><th>Próxima medición</th><th>Criterio gobernante</th></tr></thead><tbody>'+rows.map(({e,p,r})=>`<tr><td><a href="${esc(link(e))}" data-point="${esc(p.id)}">${esc(e.tag)} · ${esc(p.id)}</a></td><td>${esc(p.name)}</td><td>${badge(r.status)}${r.overdue && r.status!=='Inspección vencida'?'<small class="overdue-text">Fecha vencida</small>':''}</td><td>${dateLabel(r.due)}</td><td>${esc(r.governing||'Revisar historial')}</td></tr>`).join('')+'</tbody></table></div>'}
+function schedule(rows){return '<div class="scroll"><table><thead><tr><th>Equipo / punto</th><th>Componente</th><th>Condición</th><th>Próxima medición</th><th>Criterio gobernante</th></tr></thead><tbody>'+rows.map(({e,p,r})=>`<tr><td><a href="${esc(equipmentScreen(e,p))}">${esc(e.tag)} · ${esc(p.id)}</a></td><td>${esc(p.name)}</td><td>${badge(r.status)}${r.overdue && r.status!=='Inspección vencida'?'<small class="overdue-text">Fecha vencida</small>':''}</td><td>${dateLabel(r.due)}</td><td>${esc(r.governing||'Revisar historial')}</td></tr>`).join('')+'</tbody></table></div>'}
 function allRows(){return project.equipment.flatMap((e,i)=>e.points.map((p,j)=>({e,p,r:analysis[i].points[j]}))).sort((a,b)=>(a.r.due||'9999').localeCompare(b.r.due||'9999'))}
 function overview(){
  const rows=allRows(),eq=project.equipment;

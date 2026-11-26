@@ -8,6 +8,7 @@ Con Python 3, ejecutar `python -m http.server 8000 --bind 127.0.0.1` desde este 
 
 ## Uso
 
+- Usa Volver en la barra superior para regresar a la vista anterior. Las listas recuperan sus filtros y la conversación del asistente queda disponible durante la sesión.
 - Vista general enlaza cada estado con su filtro en la agenda.
 - En el equipo, selecciona un marcador para abrir su punto. Editar punto permite colocar el marcador desde el esquema.
 - Registra campañas anteriores por fecha. Para corregir una lectura ya guardada, indica el motivo y conserva el valor anterior en el historial de correcciones.
