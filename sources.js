@@ -134,7 +134,7 @@ function importPlan(payload,label,mapping) {
       return;
     }
     const ordered=[...p.measurements].sort((a,b)=>a.date.localeCompare(b.date));
-    const epoch=ordered.findLast(m=>m.date<date)?.epoch??ordered.find(m=>m.date>date)?.epoch??0;
+    const epoch=measurementEpochAt(p,date,ordered.findLast(m=>m.date<date),ordered.find(m=>m.date>date));
     if (measurement?.epoch != null && measurement.epoch!==epoch) {
       rejected++;push(row,'Serie histórica incompatible con el punto activo');return;
     }

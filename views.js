@@ -20,7 +20,8 @@ function detail() {
  if (tab==='ficha') return header+equipmentProfile(equipment,status);
  return header+scheduleSummary(equipment,result)+
    '<div class="inspection-grid">'+pointMap(equipment)+pointCondition(equipment,point,status)+'</div>'+
-   thicknessChart(point,status)+trendPanel(equipment,point,status)+measurementHistory(point);
+   thicknessChart(point,status)+readingReviewPanel(equipment,point,status)+
+   interventionPanel(equipment,point)+trendPanel(equipment,point,status)+measurementHistory(point);
 }
 
 function equipmentMeta(equipment) {
@@ -68,6 +69,7 @@ function pointCondition(equipment,point,s) {
    (trace?'<details class="point-notes"'+(s.status!=='Normal'?' open':'')+
      '><summary>Criterio y observaciones</summary><div class="note">'+trace+'</div></details>':'')+
    '<div class="buttons monitor-actions"><button type="button" data-tab="simular" class="primary">Simular lectura</button>'+
+   '<a class="button-link" href="#parada/'+esc(encodeURIComponent(equipment.tag))+'/'+esc(encodeURIComponent(point.id))+'">Simular parada en 3D</a>'+
    action('Editar punto','editpoint')+'</div></section>';
 }
 

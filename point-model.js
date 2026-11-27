@@ -120,11 +120,12 @@ function pointHit(patches, x, y) {
   return nearest;
 }
 
-function pointModelViewer(canvas, onPick) {
+function pointModelViewer(canvas, onPick, onMarkerPick) {
   const ctx = canvas.getContext('2d');
   const home = {yaw: 0.36, pitch: 0.33};
   let {yaw, pitch} = home;
   let zoom = 1, model, mesh, marker, rendered = [], frame, pointer;
+  let markers = [], selectable = [];
   const extent = (positions, axis) => {
     const coordinates = positions.map(position => position[axis]);
     return [Math.min(...coordinates), Math.max(...coordinates)];
@@ -204,11 +205,36 @@ function pointModelViewer(canvas, onPick) {
     if (!originHit || origin.z >= originHit.depth - 0.002) {
       label('Origen', origin, '#174d67');
     }
-    if (marker) {
-      const fraction = marker.position_mm / model.length;
-      const anchor = mapToScreen(rotate(model.surface(fraction, marker.angle_deg)));
+    function locateMarker(item) {
+      const fraction = item.position_mm / model.length;
+      const anchor = mapToScreen(rotate(model.surface(fraction, item.angle_deg)));
       const hit = pointHit(rendered, anchor.x, anchor.y);
-      const visible = !hit || anchor.z >= hit.depth - 0.001 || rotate(model.normal(fraction, marker.angle_deg))[2] > 0 && hit.depth - anchor.z < 0.004;
+      const visible = !hit || anchor.z >= hit.depth - 0.001 || rotate(model.normal(fraction, item.angle_deg))[2] > 0 && hit.depth - anchor.z < 0.004;
+      return {item, anchor, visible};
+    }
+    if (onMarkerPick) {
+      selectable = markers.map(locateMarker).filter(pin => pin.visible)
+        .sort((a, b) => Number(a.item === marker) - Number(b.item === marker) || a.anchor.z - b.anchor.z);
+      for (const {item, anchor} of selectable) {
+        const selected = item === marker;
+        if (selected) {
+          ctx.beginPath();
+          ctx.arc(anchor.x, anchor.y, 12, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#152b39';
+          ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(anchor.x, anchor.y, selected ? 9 : 7.5, 0, Math.PI * 2);
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+        if (selected) label(item.id, {...anchor, y: anchor.y - 10}, '#152b39');
+      }
+    } else if (marker) {
+      const {anchor, visible} = locateMarker(marker);
       ctx.setLineDash(visible ? [] : [3, 2]);
       ctx.beginPath();
       ctx.arc(anchor.x, anchor.y, 8.5, 0, Math.PI * 2);
@@ -248,6 +274,7 @@ function pointModelViewer(canvas, onPick) {
       const [x, y, z] = model.normal(marker.position_mm / model.length, marker.angle_deg);
       if (Math.hypot(x, z) > 0.05) yaw = Math.atan2(x, z);
       pitch = model.vertical ? 0.19 : pointClamp(Math.asin(y), -1.35, 1.35);
+      if (onMarkerPick && !model.vertical) yaw += 0.24;
     }
     requestDraw();
   }
@@ -269,12 +296,20 @@ function pointModelViewer(canvas, onPick) {
     if (pointer?.id !== event.pointerId) return;
     if (!pointer.dragged) {
       const rect = canvas.getBoundingClientRect();
-      const hit = pointHit(rendered, event.clientX - rect.left - canvas.clientLeft,
-        event.clientY - rect.top - canvas.clientTop);
-      onPick(hit && !hit.cap ? {
-        position_mm: Math.min(model.length, Math.round(pointClamp(hit.fraction, 0, 1) * model.length * 10) / 10),
-        angle_deg: pointTurn(Math.round(hit.degrees * 10) / 10)
-      } : null);
+      const x = event.clientX - rect.left - canvas.clientLeft, y = event.clientY - rect.top - canvas.clientTop;
+      if (onMarkerPick) {
+        const nearest = selectable.reduceRight((best, pin) => {
+          const distance = Math.hypot(x - pin.anchor.x, y - pin.anchor.y);
+          return distance <= 16 && (!best || distance < best.distance) ? {id: pin.item.id, distance} : best;
+        }, null);
+        if (nearest) onMarkerPick(nearest.id);
+      } else {
+        const hit = pointHit(rendered, x, y);
+        onPick(hit && !hit.cap ? {
+          position_mm: Math.min(model.length, Math.round(pointClamp(hit.fraction, 0, 1) * model.length * 10) / 10),
+          angle_deg: pointTurn(Math.round(hit.degrees * 10) / 10)
+        } : null);
+      }
     }
     pointer = null;
   });
@@ -292,7 +327,12 @@ function pointModelViewer(canvas, onPick) {
   return {
     setModel(next) { model = next; mesh = pointMesh(next); requestDraw(); },
     setMarker(next) { marker = next; requestDraw(); },
-    reset, zoomBy,
+    setMarkers(items, selectedId) {
+      markers = items;
+      marker = markers.find(item => item.id === selectedId);
+      requestDraw();
+    },
+    reset, zoomBy, rotateBy,
     close() { resize.disconnect(); if (frame) cancelAnimationFrame(frame); }
   };
 }

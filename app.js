@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const family={pipe:'Tubería',vessel:'Recipiente',tank:'Tanque'};
-const navNames={inicio:'Vista general',equipos:'Registro de equipos',agenda:'Inspecciones',riesgo:'Análisis RBI',fuentes:'Fuentes de datos',asistente:'Asistente'};
+const navNames={inicio:'Vista general',equipos:'Registro de equipos',agenda:'Inspecciones',parada:'Simular parada',riesgo:'Análisis RBI',fuentes:'Fuentes de datos',asistente:'Asistente'};
 const equipmentTabs={monitoreo:'Monitoreo',diseno:'Cálculo de diseño',simular:'Simular lectura',ficha:'Ficha técnica',documentos:'Documentos'};
 const key='estrato-project-v1';
 let py, project, analysis=[], tab='monitoreo', pointIndex=0, currentId='', template, filter='', familyFilter='', statusFilter='', saveForm, assessmentDate='', initialCase, storedCase;
@@ -19,6 +19,11 @@ function call(name,arg){py.globals.set('_payload',JSON.stringify(arg??null));ret
 function notify(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').style.display='none',3400)}
 function message(err){return String(err.message||err).split('\n').findLast(s=>s.startsWith('ValueError:'))?.replace('ValueError: ','')||String(err.message||err).split('\n')[0]}
 const validText=value=>typeof value==='string'&&Boolean(value.trim());
+function isCalendarDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false;
+  const date = new Date(value + 'T00:00:00Z');
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 function evaluateAll(p){
  if(!p||p.version!==1||!Array.isArray(p.equipment)||!p.equipment.length||!p.rbi)throw Error('Formato de proyecto incompatible.');
  const tags=new Set();
@@ -35,6 +40,7 @@ function evaluateAll(p){
  const ids=new Set();
  for(const p of e.points){if(!p||!validText(p.id)||!validText(p.name)||ids.has(p.id.toUpperCase())||![p.x,p.y].every(v=>Number.isFinite(v)&&v>=0&&v<=100)||!Array.isArray(p.measurements))throw Error('Punto o coordenada inválidos.');ids.add(p.id.toUpperCase());
  checkPointLocation(e,p.location3d);
+ validatePointInterventions(p);
  for(const m of p.measurements){
   if(!m||typeof m.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(m.date)||m.date>today()||!Number.isFinite(m.thickness)||
     !validText(m.technique)||(m.epoch!=null&&(!Number.isInteger(m.epoch)||m.epoch<0))||
@@ -116,7 +122,7 @@ function overview() {
    <small>${label}</small><b>${count}</b></div>`).join('');
  const headline=hero('CONTROL DE INTEGRIDAD','Vista general',
    'Estado de los equipos, mediciones y próximas inspecciones.',
-   action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
+   '<a href="#parada" class="button-link">Simular parada</a>'+action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
  return '<div class="dashboard-intro">'+headline+'</div><div class="kpis">'+metrics+'</div>'+
    '<div class="overview-workspace"><section class="panel">'+
    panelHeading('Agenda de inspección','Evaluación al '+dateLabel(assessmentDate||today()),'<a href="#agenda" class="link">Ver agenda →</a>')+
@@ -134,7 +140,7 @@ function listPage(name) {
  const entries=project.equipment.map((e,i)=>[e,analysis[i]]).filter(([e,r])=>matchesAsset(e)&&matchesCondition(r,statusFilter));
  const actions=isEquipment
    ?action('Caso original','reset')+action('Importar caso','import')+action('Exportar','export')+action('＋ Crear equipo','new',true)
-   :action('Exportar agenda CSV','csv');
+   :'<a href="#parada" class="button-link">Simular parada</a>'+action('Exportar agenda CSV','csv');
  const heading=hero(isEquipment?'GESTIÓN DE ACTIVOS':'PLANIFICACIÓN',navNames[name],
    isEquipment?'Antecedentes, esquemas y mediciones por equipo.':'Fechas y criterios de inspección por punto de monitoreo.',actions);
  const filters=`<div class="filters">

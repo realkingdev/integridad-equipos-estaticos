@@ -5,7 +5,8 @@ function render(){
   a.classList.toggle('on',active);
   if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
  });
- $('app').innerHTML=name==='equipo'?detail():name==='riesgo'?renderRbiWorkbench():name==='fuentes'?sourcePage():name==='asistente'?renderAssistant():['equipos','agenda'].includes(name)?listPage(name):overview()+validationPanel();
+ $('app').innerHTML=name==='equipo'?detail():name==='parada'?renderShutdown():name==='riesgo'?renderRbiWorkbench():name==='fuentes'?sourcePage():name==='asistente'?renderAssistant():['equipos','agenda'].includes(name)?listPage(name):overview()+validationPanel();
+ if(name==='parada') bindShutdown();
  initializeScenario();
  drawTrend()
 }
@@ -13,6 +14,7 @@ function editAsset(index,newFamily){
  const isNew=index<0,e=structuredClone(isNew?template.find(e=>e.family===newFamily):project.equipment[index]);
  const projectTag=e.tag;
  if(isNew){e.tag='';e.name='';e.points=e.points.slice(0,1);e.points[0].measurements=[];e.points[0].x=50;e.points[0].y=50;e.points[0].basis='Definir fuente del mínimo y criterio de alerta'}
+ if(isNew) delete e.points[0].location3d;
  const fields=metaKeys(e).map(k=>{
  let name=metaLabels[k];
  if(k==='diameter_mm')name+=' · '+({pipe:'exterior',vessel:'interior corroído',tank:'nominal'}[e.family]);
@@ -128,7 +130,8 @@ window.addEventListener('resize',()=>{if(project)drawTrend()});
 async function start(){
  try{
  py=await loadPyodide({indexURL:new URL('runtime/',document.baseURI).href});
- for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v='+(name==='engineering'?5:4));if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
+ for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v='+(name==='engineering'?6:4));if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
+ py.runPython('from engineering import shutdown_forecast as _shutdown, compare_reading as _compare_reading');
  py.runPython('import json\nfrom engineering import demo_equipment, evaluate, wall_scenarios\nfrom rbi import rbi as _risk, DEFAULTS\nfrom data_import import read_measurements_csv as _read_csv, read_sqlite_catalog as _read_sqlite_catalog, read_sqlite_table as _read_sqlite_table\ndef _evaluate(obj): return evaluate(obj, _today)\ndef _simulate(obj): return evaluate(obj[\'equipment\'], max(_today, obj[\'date\']))\ndef _wall_scenarios(obj): return wall_scenarios(obj["point"], obj["lower"], obj["higher"])');
  py.globals.set('_today',today());template=JSON.parse(py.runPython('json.dumps(demo_equipment())'));
  const coords={pipe:[[27.5,48.6],[36.9,49.3],[74.6,44.2]],vessel:[[27.1,43.1],[44.5,51.3],[62.1,51.5]],tank:[[41,75.2],[45.6,59.2],[50.5,40.9]]};

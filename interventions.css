@@ -1,0 +1,23 @@
+.interventions-panel > .row { gap: 10px; flex-wrap: wrap; }
+.intervention-record { border-top: 1px solid var(--line); padding-block: 16px 4px; }
+.intervention-record + .intervention-record { margin-top: 14px; }
+.intervention-record > p, .intervention-result p { margin-top: 4px; overflow-wrap: anywhere; }
+.intervention-record h3 { overflow-wrap: anywhere; }
+.intervention-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(134px,100%), 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  background: var(--surface-soft);
+  border-radius: 6px;
+}
+.intervention-dates dt { color: var(--muted); font-size: 12px; }
+.intervention-dates dd { font-family: var(--mono); margin: 2px 0 0; }
+.intervention-result { margin-bottom: 12px; }
+.intervention-reading-fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.history-table tr:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+.gridform textarea[name="work"] { display: block; width: 100%; resize: vertical; font: inherit; color: var(--ink); padding: 9px; border: 1px solid var(--line-strong); border-radius: 6px; }
+@media (max-width: 520px) {
+  .intervention-reading-fields { grid-template-columns: 1fr; }
+}

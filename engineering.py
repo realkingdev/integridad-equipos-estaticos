@@ -80,6 +80,96 @@ def wall_scenarios(point, lower=0.75, higher=1.25):
         }
     return scenarios
 
+def forecast_at(point, target, scenario):
+    """Condición al día elegido, con la última UT como origen y el mínimo como fin."""
+    limits = point["wall_scenarios"][scenario]
+    minimum = limits["minimum"]
+    last = date.fromisoformat(point["date"]) if point["date"] else None
+    result = dict(kind="unavailable", thickness_mm=None, margin_days=None, state="unknown")
+    if last is None:
+        return result
+    if target < last:
+        return {**result, "kind": "past"}
+    minimum_date = date.fromisoformat(minimum["date"]) if minimum["date"] else None
+    if minimum_date:
+        result["margin_days"] = (minimum_date - target).days
+    alert = point["alert_mm"]
+    threshold = point["minimum_mm"]
+    if target == last:
+        value = point["current_mm"]
+        measured_state = ("minimum" if value <= threshold else "unknown" if alert <= threshold
+                          else "alert" if value <= alert else "normal")
+        return {**result, "kind": "measured", "thickness_mm": value, "state": measured_state}
+    if minimum_date and target > minimum_date:
+        return {**result, "kind": "ended", "state": "minimum"}
+    if limits["rate"] is None:
+        return result
+    if target == minimum_date:
+        return {**result, "kind": "projected", "thickness_mm": threshold, "state": "minimum"}
+    # Misma escala de meses calendario que after_years, incluso en años bisiestos.
+    months = 12 * (target.year - last.year) + target.month - last.month
+    if shifted(last, months) > target:
+        months -= 1
+    anchor = shifted(last, months)
+    fraction = 0
+    if target > anchor:
+        try:
+            span = (shifted(last, months + 1) - anchor).days
+        except (ValueError, OverflowError):
+            span = monthrange(anchor.year, anchor.month)[1]
+        fraction = (target - anchor).days / span
+    thickness = max(threshold, point["current_mm"] - limits["rate"] * (months + fraction) / 12)
+    alert_date = limits["alert"]["date"]
+    at_alert = alert_date is not None and target.isoformat() >= alert_date
+    if alert_date == target.isoformat() and limits["alert"]["kind"] == "projected":
+        thickness = alert
+    return {**result, "kind": "projected", "state": "alert" if at_alert else "normal",
+            "thickness_mm": thickness}
+
+def shutdown_forecast(request):
+    target = date.fromisoformat(request["date"])
+    scenario = request["scenario"]
+    if scenario not in ("moderate", "adopted", "accelerated"):
+        raise ValueError("Escenario de corrosión no reconocido.")
+    return [forecast_at(point, target, scenario) for point in request["points"]]
+
+def compare_reading(request):
+    """Reconstruye la proyección adoptada sin incluir la lectura que se contrasta."""
+    point, stamp = request["point"], request["date"]
+    rows = sorted((m for m in point["measurements"] if m["date"] <= stamp), key=lambda m: m["date"])
+    if not rows or rows[-1]["date"] != stamp:
+        raise ValueError("Seleccione una medición registrada en el punto.")
+    latest = rows[-1]
+    result = dict(measured_mm=latest["thickness"] * (25.4 if latest.get("unit") == "in" else 1),
+                  previous_date=None, expected_mm=None, difference_mm=None, previous_minimum=None,
+                  revised_minimum=None, shift_days=None, reason=None)
+    if len(rows) == 1 or rows[-2].get("epoch", 0) != latest.get("epoch", 0):
+        result["reason"] = "Primera medición de esta serie. Se necesita una tendencia previa del mismo punto."
+        return result
+    target = date.fromisoformat(stamp)
+    eq = {"family": request["family"]}
+    def assessment(measurements):
+        state = inspect_point({**point, "measurements": measurements}, eq, request["design"], target)
+        state["wall_scenarios"] = wall_scenarios(state)
+        return state
+    previous = assessment(rows[:-1])
+    revised = assessment(rows)
+    result["previous_date"] = previous["date"]
+    earlier = previous["wall_scenarios"]["adopted"]["minimum"]
+    later = revised["wall_scenarios"]["adopted"]["minimum"]
+    result.update(previous_minimum=earlier, revised_minimum=later)
+    expected = forecast_at(previous, target, "adopted")
+    if earlier["kind"] == "projected" and later["kind"] == "projected":
+        result["shift_days"] = (date.fromisoformat(later["date"]) - date.fromisoformat(earlier["date"])).days
+    if expected["kind"] == "ended":
+        result["reason"] = "La proyección anterior ya terminaba en el mínimo antes de esta medición."
+    elif expected["thickness_mm"] is None:
+        result["reason"] = "Las mediciones anteriores de esta serie no permitían estimar una tasa de corrosión."
+    else:
+        result["expected_mm"] = expected["thickness_mm"]
+        result["difference_mm"] = result["measured_mm"] - expected["thickness_mm"]
+    return result
+
 def design(eq, point=None):
     fam = eq["family"]
     if fam not in MATERIAL or eq["material"] != MATERIAL[fam]:
@@ -241,6 +331,23 @@ def demo_equipment():
         eq=dict(tag=tag,family=fam,name=name,plant="Planta Costa",area="Servicios de proceso",system="Tren de transferencia",component={"pipe":"Tramo recto","vessel":"Manto cilíndrico","tank":"Manto por virolas"}[fam],service="Proceso continuo",fluid=fluid,material=MATERIAL[fam],temp_c=temp,pressure_mpa=p,operating_temp_c=min(30,temp),operating_pressure_mpa=.8*p,diameter_mm=d,nominal_mm=nom,ca_mm=ca,efficiency=e,liquid_height_m=22,sg=.8,circuit="C-101" if fam=="pipe" else "",points=[])
         for i,(label,minimum,alert,readings) in enumerate(pts):
             history=[dict(date=stamp,thickness=v,unit="mm",technique="UT",notes="Campaña de demostración",epoch=0) for stamp,v in zip(["2016-10-01","2022-10-01","2026-10-01"],readings)]
-            eq["points"].append(dict(id=f"TML-0{i+1}",name=label,x=[25,53,76][i],y=[67,48,33][i],minimum_mm=minimum,alert_mm=alert,elevation_m=2.5*i if fam=="tank" else 0,measurements=history))
+            if fam == "vessel":
+                location = dict(shape="cylinder", diameter_mm=1244.6, length_mm=3600,
+                                position_mm=[400,1700,2900][i], angle_deg=[25,80,140][i],
+                                reference="Modelo de ejemplo · soldadura A del manto y marca superior de 0°")
+            elif fam == "tank":
+                location = dict(shape="cylinder", diameter_mm=34000, length_mm=2500,
+                                position_mm=[650,1100,1850][i], angle_deg=[45,100,260][i],
+                                reference=f"Modelo de ejemplo · borde inferior de la virola {i+1} y marca norte de 0°")
+            elif i == 1:
+                location = dict(shape="elbow", diameter_mm=d, bend_radius_mm=180, bend_deg=90,
+                                position_mm=230, angle_deg=90,
+                                reference="Modelo de ejemplo · soldadura de entrada del codo y marca superior de 0°")
+            else:
+                weld = "A" if i == 0 else "R"
+                location = dict(shape="cylinder", diameter_mm=d, length_mm=1800,
+                                position_mm=500 if i == 0 else 1100, angle_deg=70 if i == 0 else 135,
+                                reference=f"Modelo de ejemplo · soldadura {weld} y marca superior de 0°")
+            eq["points"].append(dict(id=f"TML-0{i+1}",name=label,x=[25,53,76][i],y=[67,48,33][i],minimum_mm=minimum,alert_mm=alert,elevation_m=2.5*i if fam=="tank" else 0,location3d=location,measurements=history))
         result.append(eq)
     return result

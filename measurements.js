@@ -1,6 +1,6 @@
 function withMeasurementRevision(original, updated, reason) {
   const {revisions = [], ...previous} = original;
-  return {...updated,revisions:[...revisions,{date:today(),reason,previous}]};
+  return {...previous,...updated,revisions:[...revisions,{date:today(),reason,previous}]};
 }
 
 function measure(equipmentIndex, locationIndex, originalDate) {
@@ -31,7 +31,7 @@ function measure(equipmentIndex, locationIndex, originalDate) {
       if (restart && (!notes || (latest && date <= latest.date))) throw Error('Para iniciar una serie, ingresa una fecha posterior a la última lectura y describe la intervención.');
       const previous = sorted.findLast(m => m.date < date);
       const following = sorted.find(m => m.date > date);
-      let epoch = previous?.epoch ?? following?.epoch ?? 0;
+      let epoch = measurementEpochAt(point, date, previous, following);
       if (editing) {
         const series = original.epoch ?? 0;
         const priorBoundary = sorted.findLast(m => m.date < original.date && (m.epoch ?? 0) !== series);
@@ -53,6 +53,7 @@ function measure(equipmentIndex, locationIndex, originalDate) {
         else readings.push(reading);
       });
       openEquipmentScreen(equipment, point, 'monitoreo');
+      revealReadingReview(date);
       notify(editing ? 'Corrección guardada con trazabilidad' : 'Medición guardada y evaluación actualizada');
     });
 }

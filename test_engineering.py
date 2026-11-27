@@ -1,7 +1,7 @@
 """Comparaciones independientes y caminos extremos de la evaluación MAN040-B."""
 import unittest
 
-from engineering import demo_equipment, evaluate, wall_scenarios
+from engineering import compare_reading, demo_equipment, evaluate, shutdown_forecast, wall_scenarios
 
 TODAY = "2026-11-26"
 
@@ -97,6 +97,55 @@ class EngineeringTests(unittest.TestCase):
         scenarios = wall_scenarios({**point, "rate": 1e-10})
         self.assertEqual(scenarios["adopted"]["minimum"]["kind"], "calendar")
         self.assertIsNone(scenarios["adopted"]["minimum"]["date"])
+
+    def test_shutdown_stops_at_the_minimum_in_each_scenario(self):
+        elbow = evaluate(self.pipe, TODAY)["points"][1]
+        def at(stamp, scenario="adopted"):
+            return shutdown_forecast(dict(points=[elbow], date=stamp, scenario=scenario))[0]
+        self.assertEqual(at("2025-10-01")["kind"], "past")
+        self.assertEqual(at("2026-10-01")["kind"], "measured")
+        self.assertAlmostEqual(at("2031-10-01")["thickness_mm"], 3.3)
+        self.assertEqual(at("2031-10-01")["margin_days"], 366)
+        self.assertEqual(at("2031-10-01", "accelerated")["kind"], "ended")
+        self.assertEqual(at("2032-10-01"), dict(kind="projected", state="minimum", thickness_mm=3, margin_days=0))
+        self.assertEqual(at("2033-04-01"), dict(kind="ended", state="minimum", thickness_mm=None, margin_days=-182))
+        self.assertEqual(at("9999-12-31")["kind"], "ended")
+
+    def test_shutdown_measured_minimum_and_unavailable_rate(self):
+        vessel = evaluate(self.vessel, TODAY)["points"][2]
+        tank = evaluate(self.tank, TODAY)["points"][2]
+        def at(stamp):
+            return shutdown_forecast(dict(points=[vessel,tank], date=stamp, scenario="moderate"))
+        limit, uncertain = at("2026-10-01")
+        self.assertEqual((limit["kind"],limit["state"],limit["thickness_mm"]), ("measured","minimum",9.9))
+        self.assertEqual((uncertain["kind"],uncertain["state"]), ("measured","normal"))
+        limit, uncertain = at("2028-04-01")
+        self.assertEqual((limit["kind"],limit["state"],limit["thickness_mm"]), ("ended","minimum",None))
+        self.assertEqual(uncertain, dict(kind="unavailable",state="unknown",thickness_mm=None,margin_days=None))
+
+    def test_reading_comparison_excludes_observation_and_uses_same_series(self):
+        elbow = self.pipe["points"][1]
+        state = evaluate(self.pipe,TODAY)["points"][1]
+        def compare(stamp):
+            return compare_reading(dict(family="pipe",point=elbow,design=state["design"],date=stamp))
+        result = compare("2026-10-01")
+        self.assertAlmostEqual(result["expected_mm"], 5.8)
+        self.assertAlmostEqual(result["difference_mm"], -1)
+        self.assertEqual(result["previous_date"], "2022-10-01")
+        self.assertEqual(result["revised_minimum"]["date"], "2032-10-01")
+        self.assertLess(result["shift_days"], 0)
+        self.assertIsNone(compare("2022-10-01")["expected_mm"])
+        elbow["measurements"][-1]["epoch"] = 1
+        self.assertIsNone(compare("2026-10-01")["previous_minimum"])
+
+    def test_new_reading_after_previous_minimum_has_no_extrapolated_thickness(self):
+        elbow = self.pipe["points"][1]
+        state = evaluate(self.pipe,TODAY)["points"][1]
+        elbow["measurements"].append(dict(date="2033-10-01",thickness=2.54/25.4,unit="in"))
+        result = compare_reading(dict(family="pipe",point=elbow,design=state["design"],date="2033-10-01"))
+        self.assertIsNone(result["expected_mm"])
+        self.assertEqual(result["revised_minimum"]["kind"], "measured")
+        self.assertAlmostEqual(result["measured_mm"], 2.54)
 
 if __name__=="__main__":
     unittest.main()
