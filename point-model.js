@@ -6,6 +6,8 @@ const pointClamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 function pointGeometry(familyName, data) {
   const {shape, diameter_mm, length_mm, bend_radius_mm, bend_deg} = data;
+  const zero = data.zero_deg ?? 0;
+  if (!Number.isFinite(zero) || zero < 0 || zero >= 360) throw Error('La referencia angular debe estar entre 0° y 360°.');
   const curved = shape === 'elbow';
   const vertical = familyName === 'tank';
   const radius = diameter_mm / 2;
@@ -29,7 +31,7 @@ function pointGeometry(familyName, data) {
     return [Math.sin(angle) * (bend_radius_mm / scale), 0, 2 * Math.sin(angle / 2)**2 * (bend_radius_mm / scale)];
   }
   function normal(fraction, degrees) {
-    const angle = degrees * pointRadians, sine = Math.sin(angle), cosine = Math.cos(angle);
+    const angle = (degrees + zero) * pointRadians, sine = Math.sin(angle), cosine = Math.cos(angle);
     if (vertical) return [-sine, 0, cosine];
     const bend = curved ? fraction * bend_deg * pointRadians : 0;
     return [-Math.sin(bend) * sine, cosine, Math.cos(bend) * sine];

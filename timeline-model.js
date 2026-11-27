@@ -12,7 +12,7 @@ function timelineSurfaceKey(equipment, point) {
   if (!loc) return '';
   return JSON.stringify([equipment.tag, loc.shape, loc.diameter_mm,
     loc.shape === 'elbow' ? [loc.bend_radius_mm, loc.bend_deg] : loc.length_mm,
-    equipment.family === 'tank' ? point.elevation_m : null, loc.reference.trim()]);
+    equipment.family === 'tank' ? point.elevation_m : null, loc.reference.trim(), loc.zero_deg ?? 0]);
 }
 
 function timelineWindow(row, date) {
@@ -147,7 +147,7 @@ function createTimelineModel(root) {
     const location = selected.p.location3d;
     if (location.shape === 'elbow') {
       // An oblique view keeps side-wall markers visible while showing the bend in its plane.
-      const pitch = Math.asin(Math.cos(location.angle_deg * Math.PI / 180));
+      const pitch = Math.asin(Math.cos((location.angle_deg + (location.zero_deg ?? 0)) * Math.PI / 180));
       const tilt = Math.max(0, 0.7 - Math.abs(pitch));
       viewer.rotateBy(0, pitch < -0.01 ? -tilt : tilt);
     }

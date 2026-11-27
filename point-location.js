@@ -29,7 +29,9 @@ function pointLocationFields(equipment, point) {
     '<div class="location-bend" data-location-size="elbow" hidden>' +
     field('location_radius', 'Radio al eje (mm)', saved?.bend_radius_mm, 'number', 'inputmode="decimal"') +
     field('location_bend', 'Ángulo del codo (°)', saved?.bend_deg ?? 90, 'number', 'inputmode="decimal"') + '</div></div>' +
-    field('location_reference', 'Origen y marca de 0°', saved?.reference, 'text',
+    '<button type="button" data-pick-zero aria-pressed="false">Marcar inicio (0°) en el modelo</button>' +
+    '<small data-zero-help aria-live="polite"></small>' +
+    field('location_reference', 'Referencia visible en terreno', saved?.reference, 'text',
       'placeholder="' + (tank ? 'Ej. borde inferior y soldadura norte' : 'Ej. brida B1 y marca superior') + '"') +
     '<div class="location-coordinates">' +
     field('location_position', tank ? 'Altura desde el borde inferior (mm)' : 'Distancia desde el origen (mm)', saved?.position_mm, 'number', 'inputmode="decimal"') +
@@ -54,9 +56,33 @@ function initializePointLocation(equipment, point) {
   const position = form.location_position;
   const angle = form.location_angle;
   let model, geometryReady = false, pickedFraction = null, mode = '3d';
+  let zero = point.location3d?.zero_deg ?? 0, choosingZero = false;
+  const zeroButton = root.querySelector('[data-pick-zero]');
+  function zeroMode(active) {
+    choosingZero = active;
+    zeroButton.setAttribute('aria-pressed', String(active));
+    zeroButton.textContent = active ? 'Cancelar selección de inicio' : 'Marcar inicio (0°) en el modelo';
+    root.querySelector('[data-zero-help]').textContent = active
+      ? 'Gira el equipo y toca la pared a la altura de una soldadura o marca visible. Esa dirección será tu 0°.'
+      : (equipment.family === 'tank' ? 'La altura se mide desde el borde inferior. ' : 'La distancia se mide desde el extremo de entrada. ') +
+        'El ángulo se mide desde la línea de 0°. Puedes describir la marca física para encontrarla en terreno.';
+  }
+  zeroButton.onclick = () => zeroMode(!choosingZero);
+  zeroMode(false);
   const viewer = pointModelViewer(root.querySelector('canvas'), hit => {
     if (!hit) {
       selection.textContent = 'Pulsa sobre la pared lateral del equipo.';
+      return;
+    }
+    if (choosingZero) {
+      const offset = hit.angle_deg;
+      const relative = v => Number(pointTurn(v).toFixed(6)) % 360;
+      zero = relative(zero + offset);
+      if (Number.isFinite(angle.valueAsNumber)) angle.value = relative(angle.valueAsNumber - offset);
+      form.location_reference.value = 'Marca visual en el modelo a ' + fmt(zero,1) + '° desde la referencia inicial';
+      zeroMode(false);
+      refreshGeometry();
+      root.querySelector('[data-zero-help]').textContent = 'Inicio marcado. Ahora toca el punto de medición o ajusta sus coordenadas. Pulsa Guardar para registrar los cambios.';
       return;
     }
     position.value = hit.position_mm;
@@ -67,7 +93,7 @@ function initializePointLocation(equipment, point) {
   $('modal').addEventListener('close', viewer.close, {once: true});
   const shape = () => form.location_shape?.value ?? 'cylinder';
   const readGeometry = () => ({
-    shape: shape(),
+    shape: shape(), zero_deg: zero,
     diameter_mm: form.location_diameter.valueAsNumber,
     ...(shape() === 'elbow' ? {
       bend_radius_mm: form.location_radius.valueAsNumber,
@@ -95,7 +121,7 @@ function initializePointLocation(equipment, point) {
       const diameter = form.location_diameter.valueAsNumber;
       const d = diameter > 0 && diameter <= 1e9 ? diameter : equipment.diameter_mm;
       model = pointGeometry(equipment.family, {
-        shape: shape(), diameter_mm: d, length_mm: equipment.family === 'tank' ? 2500 : d * 4,
+        shape: shape(), zero_deg: zero, diameter_mm: d, length_mm: equipment.family === 'tank' ? 2500 : d * 4,
         bend_radius_mm: d * 1.5, bend_deg: 90
       });
       geometryReady = false;
@@ -105,7 +131,7 @@ function initializePointLocation(equipment, point) {
       ? 'Ángulo horario visto desde arriba, a partir de la marca de 0°.'
       : '0° arriba. Ángulo horario mirando desde el origen hacia el tramo.';
     guidance.textContent = (geometryReady ? 'Distancia de 0 a ' + fmt(model.length, 1) + ' mm. ' : 'Completa las cotas para guardar. ') +
-      (shape() === 'elbow' ? 'Distancia sobre el eje curvo. 0° arriba y 90° hacia el interior del codo.' : direction);
+      (zero ? 'Ángulo desde tu marca de inicio.' : shape() === 'elbow' ? 'Distancia sobre el eje curvo. 0° arriba y 90° hacia el interior del codo.' : direction);
     viewer.setModel(model);
     refreshMarker();
   }
@@ -122,6 +148,7 @@ function initializePointLocation(equipment, point) {
   root.querySelector('[data-location-reset]').addEventListener('click', () => viewer.reset());
   focus.addEventListener('click', () => viewer.reset(true));
   form.location_shape?.addEventListener('change', () => {
+    zero = 0; zeroMode(false);
     position.value = angle.value = '';
     pickedFraction = null;
     refreshGeometry();
@@ -143,6 +170,8 @@ function initializePointLocation(equipment, point) {
       [form.x, form.y].find(input => !(input.valueAsNumber >= 0 && input.valueAsNumber <= 100)).focus();
       throw Error('Las coordenadas del esquema deben estar entre 0 y 100 %.');
     }
+    if (choosingZero) throw Error('Toca la pared para fijar el inicio o cancela la selección.');
+    if (zero && !position.value && !angle.value) throw Error('Marca también el punto de medición antes de guardar.');
     if (!position.value && !angle.value && !position.validity.badInput && !angle.validity.badInput) return undefined;
     const location = {...readGeometry(), ...readCoordinates(), reference: form.location_reference.value.trim()};
     try {
