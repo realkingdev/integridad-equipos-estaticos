@@ -23,7 +23,7 @@ const guideTopics = {
     question: '¿Cómo sé si un punto llega a la próxima parada?',
     answer: 'Elige la fecha de parada y un escenario de corrosión. Compara el espesor proyectado con el mínimo y revisa el margen. El modelo termina la proyección cuando alcanza ese mínimo.',
     label: 'Abrir simulador de parada',
-    match: /parada|fin de vida|termino de vida|cuando.*(?:reemplaz|cambiar el equipo|llega.*minimo)/
+    match: /parada|fin de vida|termino de vida|cuando.*(?:reemplaz|cambiar el equipo|(?:lleg|alcanz).*minimo)/
   },
   simulate: {
     question: '¿Cómo pruebo otro espesor sin cambiar el historial?',
@@ -138,7 +138,7 @@ function guideAnswer(topic, row, question) {
     const scenario=/acelerad/.test(q)?'accelerated':/moderad/.test(q)?'moderate':'adopted';
     const limits=r.wall_scenarios[scenario];
     const crossing=limits.minimum;
-    result.body=header+'\n\nEscenario '+wallProfiles.find(it=>it.key===scenario).label.toLowerCase()+'. '+
+    result.body=header+'\n\nTasa '+wallProfiles.find(it=>it.key===scenario).label.toLowerCase()+'. '+
       (crossing.kind==='measured'?'El mínimo ya estaba alcanzado en la medición del '+wallDate(crossing)+'.':
       crossing.kind==='projected'?'Mínimo estimado para el '+wallDate(crossing)+'.':'Fecha del mínimo: '+wallDate(crossing)+'.');
     if(date) {

@@ -5,7 +5,6 @@ const examples=[
   '¿Qué puntos están bajo el mínimo?',
   '¿Cuál es el riesgo económico RBI?',
   '¿Qué inspecciones de tubería vencen en 90 días?',
-  '¿Qué pasa si el codo L-101 mide 4,4 mm?',
   '¿Dónde conecto una base de datos?'
 ];
 const chatNormalize = text=>labelKey(text).replace(/[^a-z0-9]+/g,' ').trim();
@@ -17,6 +16,8 @@ const chatReading=(n,unit,d=2)=>Number.isFinite(n)?fmt(n,d)+' '+unit:'sin cálcu
 const chatDate=()=>dateLabel(assessmentDate||today());
 
 function renderAssistant() {
+  const selected=currentGuideRow(allRows());
+  const suggestions=selected?['¿Cuánto espesor tiene?', '¿Cuál es su vida remanente?', '¿Qué pasa si mide 4,4 mm?']:examples;
   const turns=chatMessages.map((reply,index)=>{
     const {role,body,links}=reply;
     return (
@@ -33,9 +34,9 @@ function renderAssistant() {
       '<button type="button" data-chat-question="'+esc(guideTopics[key].question)+'">'+label+'</button>').join('')+'</div>'+
     '<div class="chat-stream" id="chat-stream" tabindex="0" aria-label="Conversación" role="log">'+
     (turns||'<div class="chat-empty"><h3>¿Qué necesitas encontrar?</h3><div class="chat-examples">'+
-      examples.map(q=>'<button type="button" data-chat-question="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div></div>')+'</div>'+
+      suggestions.map(q=>'<button type="button" data-chat-question="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div></div>')+'</div>'+
     '<form id="chat-form" class="chat-form"><label class="sr-only" for="chat-question">Pregunta sobre el caso</label>'+
-    '<input id="chat-question" name="question" value="'+esc(chatDraft)+'" maxlength="350" placeholder="Ej. ¿Cuánto espesor tiene TML-02 de L-101?" required>'+
+    '<input id="chat-question" name="question" value="'+esc(chatDraft)+'" maxlength="350" placeholder="'+(selected?'Ej. ¿Cuándo se alcanzaría el mínimo?':'Ej. ¿Qué puntos requieren atención primero?')+'" required>'+
     '<button class="primary" type="submit">Enviar ↑</button></form>'+
     '<small class="muted">Respuestas calculadas en este navegador con los datos del caso.</small></section>'+assistantFaq();
 }
