@@ -41,6 +41,45 @@ def after_years(start, years):
     days = (shifted(start, floor(months)+1)-anchor).days
     return anchor + timedelta(days=floor(days*(months-floor(months))))
 
+def wall_scenarios(point, lower=0.75, higher=1.25):
+    """Cruces del espesor de alerta y mínimo a partir de la última medición."""
+    lower = number(lower, "factor moderado", 0.0001, 1)
+    higher = number(higher, "factor acelerado", 1)
+    stamp = point["date"]
+    measured = point["current_mm"]
+    reference = date.fromisoformat(stamp) if stamp else None
+    adopted = point["rate"]
+
+    def crossing(limit, rate):
+        if reference is None or limit is None:
+            return {"kind": "unavailable", "date": None, "years": None}
+        if measured <= limit:
+            return {"kind": "measured", "date": stamp, "years": 0}
+        if rate is None:
+            return {"kind": "unavailable", "date": None, "years": None}
+        years = (measured - limit) / rate
+        if not isfinite(years):
+            return {"kind": "calendar", "date": None, "years": None}
+        try:
+            if years >= 10000 - reference.year:
+                raise OverflowError
+            target = after_years(reference, years).isoformat()
+        except (OverflowError, ValueError):
+            return {"kind": "calendar", "date": None, "years": years}
+        return {"kind": "projected", "date": target, "years": years}
+
+    alert = point["alert_mm"] if point["alert_mm"] > point["minimum_mm"] else None
+    scenarios = {}
+    for name, factor in (("moderate", lower), ("adopted", 1), ("accelerated", higher)):
+        adjusted = adopted * factor if adopted is not None else None
+        rate = adjusted if adjusted is not None and isfinite(adjusted) and adjusted > 0 else None
+        scenarios[name] = {
+            "rate": rate,
+            "alert": crossing(alert, rate),
+            "minimum": crossing(point["minimum_mm"], rate),
+        }
+    return scenarios
+
 def design(eq, point=None):
     fam = eq["family"]
     if fam not in MATERIAL or eq["material"] != MATERIAL[fam]:
@@ -184,6 +223,7 @@ def evaluate(equipment,today=None):
         raise ValueError("Identificador de TML repetido.")
     for point in points:
         point["overdue"] = bool(point["due"] and point["due"] < today.isoformat())
+        point["wall_scenarios"] = wall_scenarios(point)
     dated=[pt for pt in points if pt["due"]]
     first=min(dated,key=lambda pt: (pt["due"],-STATUS.index(pt["status"]))) if dated else {}
     status=max((pt["status"] for pt in points),key=STATUS.index,default="Información insuficiente")

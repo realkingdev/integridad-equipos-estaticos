@@ -10,9 +10,10 @@ Con Python 3, ejecutar `python -m http.server 8000 --bind 127.0.0.1` desde este 
 
 - Usa Volver en la barra superior para regresar a la vista anterior. Las listas recuperan sus filtros y la conversación del asistente queda disponible durante la sesión.
 - Vista general enlaza cada estado con su filtro en la agenda.
-- En el equipo, selecciona un marcador para abrir su punto. Editar punto permite colocar el marcador desde el esquema.
+- En el equipo, selecciona un marcador para abrir su punto. En Editar punto, ingresa las cotas y la referencia de terreno, gira el modelo 3D y marca la pared. Puedes ajustar la distancia y el ángulo en los campos. El modelo cubre tramos rectos, codos circulares, mantos cilíndricos y virolas.
 - Registra campañas anteriores por fecha. Para corregir una lectura ya guardada, indica el motivo y conserva el valor anterior en el historial de correcciones.
 - En Inspecciones, cambia la fecha de evaluación para explorar vencimientos. La fecha simulada afecta las vistas durante la sesión.
+- En Proyección de vida del punto, compara la fecha de alerta y de mínimo para las tasas moderada, adoptada y acelerada. Ajusta las tasas hipotéticas en el gráfico. El plan por espesor usa la tasa adoptada y distingue cruces medidos de cruces proyectados.
 - Cambia las variables directamente en Análisis RBI, Cálculo de diseño o Simular lectura para ver una comparación inmediata con el caso guardado. Los cambios se conservan al seleccionar Guardar o Aplicar.
 - En RBI, Calcular para un objetivo obtiene la consecuencia por evento que corresponde a un riesgo anual dado y a la frecuencia del escenario activo.
 - En cada simulador, captura las entradas y resultados en las alternativas A y B. Las capturas se guardan con el caso y Cargar entradas devuelve una alternativa al formulario para recalcularla.

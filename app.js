@@ -34,6 +34,7 @@ function evaluateAll(p){
  if(e.image&&!/^data:image\/(png|jpeg);base64,[a-zA-Z0-9+/=]+$/.test(e.image))throw Error('El esquema debe ser PNG o JPG.');
  const ids=new Set();
  for(const p of e.points){if(!p||!validText(p.id)||!validText(p.name)||ids.has(p.id.toUpperCase())||![p.x,p.y].every(v=>Number.isFinite(v)&&v>=0&&v<=100)||!Array.isArray(p.measurements))throw Error('Punto o coordenada inválidos.');ids.add(p.id.toUpperCase());
+ checkPointLocation(e,p.location3d);
  for(const m of p.measurements){
   if(!m||typeof m.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(m.date)||m.date>today()||!Number.isFinite(m.thickness)||
     !validText(m.technique)||(m.epoch!=null&&(!Number.isInteger(m.epoch)||m.epoch<0))||
@@ -53,7 +54,7 @@ function commit(change){
  storedCase=serialized;project=copy;analysis=result;$('saved').textContent='Guardado en este navegador';render()
 }
 function dialog(title,body,callback,submit='Guardar'){
- $('fields').innerHTML='<h2>'+esc(title)+'</h2><div class="gridform">'+body+'</div>';$('error').textContent='';$('submit').textContent=submit;saveForm=callback;$('modal').showModal()
+ $('fields').innerHTML='<h2 id="dialog-title">'+esc(title)+'</h2><div class="gridform">'+body+'</div>';$('error').textContent='';$('submit').textContent=submit;saveForm=callback;$('modal').showModal()
 }
 $('cancel').onclick=()=>$('modal').close();
 $('form').onsubmit=async e=>{e.preventDefault();$('submit').disabled=true;try{await saveForm(new FormData(e.target));$('modal').close()}catch(err){$('error').textContent=message(err)}finally{$('submit').disabled=false}};
@@ -121,6 +122,7 @@ function overview() {
    panelHeading('Agenda de inspección','Evaluación al '+dateLabel(assessmentDate||today()),'<a href="#agenda" class="link">Ver agenda →</a>')+
    schedule(rows.filter(({r})=>r.due).slice(0,5),true)+'</section>'+
    '<section class="panel">'+panelHeading('Condición de los puntos','Filtra la agenda por condición.')+statusSummary(rows)+'</section></div>'+
+   wallPortfolio(rows,true)+
    panelHeading('Equipos monitoreados','', '<a href="#equipos" class="link">Ver registro →</a>')+
    cards(assets.slice(0,3).map((e,i)=>[e,analysis[i]]));
 }
@@ -147,5 +149,7 @@ function listPage(name) {
      :'<p class="empty panel">Sin equipos para este filtro.</p>'
    :'<section class="panel">'+panelHeading('Programación de inspecciones',rows.length+' '+(rows.length===1?'punto de monitoreo':'puntos de monitoreo'))+
      (rows.length?schedule(rows):'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>')+'</section>';
- return heading+filters+content;
+ const interventions=isEquipment?'':wallPortfolio(allRows().filter(({e,r})=>
+   matchesAsset(e)&&matchesCondition(r,statusFilter)&&(!scheduleTag||e.tag===scheduleTag)));
+ return heading+filters+interventions+content;
 }

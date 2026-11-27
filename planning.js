@@ -3,7 +3,8 @@ function scheduleSummary(e,r) {
  return '<section class="panel plan-banner"><div class="row"><h2>Plan del equipo</h2>'+badge(r.status)+'</div>'+
    '<div class="plan-fields"><div><small>Punto gobernante</small><strong class="mono">'+esc(point?.id||'—')+'</strong></div>'+
    '<div><small>Próxima medición</small><strong class="table-number">'+dateLabel(r.due)+'</strong></div>'+
-   '<div><small>Criterio</small><strong>'+esc(point?.governing||'Revisar antecedentes pendientes')+'</strong></div></div></section>';
+   '<div><small>Criterio</small><strong>'+esc(point?.governing||'Revisar antecedentes pendientes')+'</strong></div></div>'+
+   wallGoverning(e,r)+'</section>';
 }
 function designPointChooser(e,index) {
  const locations=e.points.map((p,i)=>[i,p.id+' · '+p.name]);

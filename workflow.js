@@ -72,14 +72,7 @@ function openDocument(index) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-function selectMarkerPosition(photoUrl, point) {
-  const content = document.createElement('div');
-  content.innerHTML = '<div class="picker" id="picker"><img src="' + esc(photoUrl) + '" alt="Esquema para ubicar el marcador"><span class="pin" aria-hidden="true">+</span></div>' +
-    '<small>Haz clic en el esquema o ajusta las coordenadas en los campos.</small>';
-  content.className = 'wide';
-  $('fields').querySelector('.gridform').prepend(content);
-  const picker = $('picker');
-  const x = $('form').elements.x, y = $('form').elements.y;
+function selectMarkerPosition(picker, x, y) {
   const pin = picker.querySelector('.pin');
   const update = () => {
     pin.style.left = Number(x.value) + '%';

@@ -19,8 +19,8 @@ function detail() {
  if (tab==='simular') return header+renderInspectionWorkbench(equipment,point);
  if (tab==='ficha') return header+equipmentProfile(equipment,status);
  return header+scheduleSummary(equipment,result)+
-   '<div class="inspection-grid">'+pointMap(equipment)+pointCondition(point,status)+'</div>'+
-   '<div class="inspection-grid">'+thicknessChart(point)+trendPanel(equipment,point,status)+'</div>'+measurementHistory(point);
+   '<div class="inspection-grid">'+pointMap(equipment)+pointCondition(equipment,point,status)+'</div>'+
+   thicknessChart(point,status)+trendPanel(equipment,point,status)+measurementHistory(point);
 }
 
 function equipmentMeta(equipment) {
@@ -53,7 +53,7 @@ function wallScale(s) {
    ';--alert-stop:'+stop(alert)+';--reading-stop:'+stop(measured)+'"><span class="wall-marker"></span></div>';
 }
 
-function pointCondition(point,s) {
+function pointCondition(equipment,point,s) {
  const label=[point.cml,point.id].filter(Boolean).join(' / ');
  const warnings=s.warnings||[];
  const trace=[s.governing,point.basis,...warnings].filter(Boolean).map(line=>'<p>'+esc(line)+'</p>').join('');
@@ -64,18 +64,36 @@ function pointCondition(point,s) {
    ' <span class="unit">años</span></strong></div></div>'+
    '<div class="metrics">'+metric('Mínimo en servicio',fmt(s.minimum_mm)+' mm')+metric('Alerta',fmt(s.alert_mm)+' mm')+'</div>'+
    wallScale(s)+'<div class="point-date"><span class="muted">Próxima medición</span><strong>'+dateLabel(s.due)+'</strong></div>'+
+   pointLocationSummary(equipment,point)+
    (trace?'<details class="point-notes"'+(s.status!=='Normal'?' open':'')+
      '><summary>Criterio y observaciones</summary><div class="note">'+trace+'</div></details>':'')+
    '<div class="buttons monitor-actions"><button type="button" data-tab="simular" class="primary">Simular lectura</button>'+
    action('Editar punto','editpoint')+'</div></section>';
 }
 
-function thicknessChart(point) {
- return '<section class="panel"><div class="row chart-header"><div><h2>Evolución del espesor</h2>'+
-   '<p>Espesor en mm por fecha de campaña</p></div><span class="eyebrow">'+esc(point.id)+'</span></div>'+
-   '<canvas id="trend" class="plot" aria-label="Tendencia de espesor por fecha. Lecturas y unidades en el historial."></canvas>'+
-   '<div class="legend"><span><i></i>Medición</span><span class="projection"><i></i>Proyección hasta próxima fecha</span>'+
-   '<span class="threshold"><i></i>Alerta</span><span class="minimum"><i></i>Mínimo</span></div></section>';
+function thicknessChart(point,state) {
+ const projections = state.rate > 0 && state.current_mm > state.minimum_mm;
+ return '<section class="panel thickness-panel" aria-labelledby="trend-title">' +
+   '<div class="row chart-header"><div><h2 id="trend-title">Proyección de vida del punto</h2>' +
+   '<p>Espesor medido y fecha estimada de llegada al mínimo en servicio.</p></div>' +
+   '<span class="eyebrow">'+esc(point.id)+'</span></div>' + wallResponse(state) +
+   (point.measurements.length ? '<div class="row trend-controls"><div class="trend-reading" aria-live="polite"></div>' +
+     (projections ? '<div class="point-view-switch" role="group" aria-label="Vista de espesor">' +
+     '<button type="button" data-trend-mode="all" aria-pressed="true">Historial y proyección</button>' +
+     '<button type="button" data-trend-mode="history" aria-pressed="false">Solo historial</button></div>' : '') +
+     '</div><canvas id="trend" class="plot" tabindex="0" aria-label="Gráfico de espesor. Usa las flechas para recorrer las lecturas."></canvas>' +
+     '<div class="legend trend-key"><span><i></i>Mediciones</span>'+
+     '<span class="threshold"><i></i>Alerta '+fmt(state.alert_mm)+' mm</span>'+
+     '<span class="minimum"><i></i>Mínimo '+fmt(state.minimum_mm)+' mm</span></div>'
+     : '<p class="empty">Registra mediciones para ver el historial de espesor.</p>') +
+   '<div class="scroll table-frame"><table class="data-table wall-table wall-scenarios"><thead><tr><th scope="col">Escenario</th>' +
+   '<th scope="col">Tasa (mm/año)</th><th scope="col">Fecha de alerta</th><th scope="col">Fecha al mínimo</th></tr></thead>' +
+   '<tbody data-wall-rows>'+wallScenarioRows(state.wall_scenarios)+'</tbody></table></div>'+
+   (projections ? '<details class="wall-adjust"><summary>Ajustar escenarios</summary><p>Las tasas moderada y acelerada son hipótesis aplicadas a la tasa adoptada.</p>'+
+     '<div class="row"><label>Tasa moderada (% de adoptada)<input type="number" inputmode="decimal" min="0.01" max="100" step="any" value="75" data-wall-factor="lower"></label>'+
+     '<label>Tasa acelerada (% de adoptada)<input type="number" inputmode="decimal" min="100" step="any" value="125" data-wall-factor="higher"></label>'+
+     '<button type="button" data-wall-reset>Restablecer</button></div><p role="status" class="wall-adjust-message"></p></details>' : '') +
+   '<p class="wall-footnote">La proyección supone una tasa constante desde la última lectura. La evaluación técnica define si corresponde reparar o reemplazar el componente.</p></section>';
 }
 
 function trendPanel(equipment,point,s) {

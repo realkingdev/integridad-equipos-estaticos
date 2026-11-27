@@ -1,7 +1,7 @@
 """Comparaciones independientes y caminos extremos de la evaluación MAN040-B."""
 import unittest
 
-from engineering import demo_equipment, evaluate
+from engineering import demo_equipment, evaluate, wall_scenarios
 
 TODAY = "2026-11-26"
 
@@ -69,6 +69,34 @@ class EngineeringTests(unittest.TestCase):
         for m in self.pipe["points"][0]["measurements"]:
             m["thickness"]=5
         self.assertIsNone(evaluate(self.pipe,TODAY)["points"][0]["life_years"])
+
+    def test_wall_projection_crosses_alert_and_minimum_after_inspection(self):
+        point = evaluate(self.pipe, TODAY)["points"][1]
+        base = point["wall_scenarios"]["adopted"]
+        self.assertEqual(base["alert"]["date"], "2027-10-01")
+        self.assertEqual(base["minimum"]["date"], "2032-10-01")
+        self.assertAlmostEqual(base["minimum"]["years"], 6)
+        scenarios = wall_scenarios(point, lower=0.5, higher=2)
+        self.assertEqual(scenarios["accelerated"]["minimum"]["date"], "2029-10-01")
+        self.assertEqual(scenarios["moderate"]["minimum"]["date"], "2038-10-01")
+        self.assertEqual(scenarios["adopted"], base)
+
+    def test_wall_projection_distinguishes_observed_and_missing_crossings(self):
+        below = evaluate(self.vessel, TODAY)["points"][2]
+        minimum = below["wall_scenarios"]["adopted"]["minimum"]
+        self.assertEqual(minimum, {"kind": "measured", "date": "2026-10-01", "years": 0})
+        tank = evaluate(self.tank, TODAY)["points"][2]
+        for scenario in tank["wall_scenarios"].values():
+            self.assertEqual(scenario["minimum"], {"kind": "unavailable", "date": None, "years": None})
+        self.pipe["points"][1]["measurements"][-1]["epoch"] = 1
+        restarted = evaluate(self.pipe, TODAY)["points"][1]["wall_scenarios"]
+        self.assertIsNone(restarted["adopted"]["minimum"]["date"])
+
+    def test_wall_projection_keeps_long_horizons_outside_calendar(self):
+        point = evaluate(self.pipe, TODAY)["points"][1]
+        scenarios = wall_scenarios({**point, "rate": 1e-10})
+        self.assertEqual(scenarios["adopted"]["minimum"]["kind"], "calendar")
+        self.assertIsNone(scenarios["adopted"]["minimum"]["date"])
 
 if __name__=="__main__":
     unittest.main()
