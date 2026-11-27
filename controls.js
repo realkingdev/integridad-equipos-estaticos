@@ -76,6 +76,23 @@ function handleAction(act){
  if(act==='new'){dialog('Familia del equipo',select('family','Familia',Object.entries(family),'pipe'),f=>setTimeout(()=>editAsset(-1,f.get('family')),0),'Continuar');return}
  if(act==='measureAny')return chooseMeasurement();
  if(!e)return;
+ if(act==='deleteAsset'){
+   const readings=e.points.reduce((n,p)=>n+p.measurements.length,0);
+   const body='<div class="wide"><p>Se eliminará <strong>'+esc(e.tag)+' · '+esc(e.name)+'</strong> de este caso.</p>'+
+     '<p>Puntos: '+e.points.length+' · Mediciones: '+readings+' · Documentos: '+(e.documents?.length||0)+
+     '.</p><p>También se eliminarán sus intervenciones, esquema y comparaciones.</p>'+action('Exportar respaldo','export')+'</div>';
+   return dialog('¿Eliminar '+e.tag+'?',body,()=>{
+     const belongs=id=>{
+       try {const parts=JSON.parse(id);return Array.isArray(parts)&&parts[1]===e.tag} catch {return false}
+     };
+     commit(draft=>{
+       draft.equipment=draft.equipment.filter(asset=>asset.tag!==e.tag);
+       if(Array.isArray(draft.comparisons))draft.comparisons=draft.comparisons.filter(item=>!belongs(item?.id));
+     });
+     for(const id of scenarioDrafts.keys())if(belongs(id))scenarioDrafts.delete(id);
+     navigate('#equipos',{replace:true});notify('Equipo '+e.tag+' eliminado');
+   },'Eliminar equipo');
+ }
  if(act==='measure')return measure(i,pointIndex);
  if(act==='edit')return editAsset(i);
  if(act==='point'||act==='editpoint')return pointForm(i,act==='point'?-1:pointIndex);

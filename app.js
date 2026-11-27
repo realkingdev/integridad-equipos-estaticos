@@ -25,7 +25,7 @@ function isCalendarDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 function evaluateAll(p){
- if(!p||p.version!==1||!Array.isArray(p.equipment)||!p.equipment.length||!p.rbi)throw Error('Formato de proyecto incompatible.');
+ if(!p||p.version!==1||!Array.isArray(p.equipment)||!p.rbi)throw Error('Formato de proyecto incompatible.');
  const tags=new Set();
  if(p.rbi.costBasis!==undefined && !validText(p.rbi.costBasis))throw Error('Indica la base de valoración económica.');
  const results=p.equipment.map(e=>{
@@ -122,7 +122,7 @@ function overview() {
    <small>${label}</small><b>${count}</b></div>`).join('');
  const headline=hero('CONTROL DE INTEGRIDAD','Vista general',
    'Estado de los equipos, mediciones y próximas inspecciones.',
-   '<a href="#asistente" class="button-link">Consultar al asistente</a><a href="#parada" class="button-link">Simular parada</a>'+action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
+   '<a href="#asistente" class="button-link">Consultar al asistente</a><a href="#parada" class="button-link">Simular parada</a>'+action('Exportar caso','export')+(assets.length?action('＋ Registrar medición','measureAny',true):action('＋ Crear equipo','new',true)));
  return '<div class="dashboard-intro">'+headline+'</div><div class="kpis">'+metrics+'</div>'+
    '<div class="overview-workspace"><section class="panel">'+
    panelHeading('Agenda de inspección','Evaluación al '+dateLabel(assessmentDate||today()),'<a href="#agenda" class="link">Ver agenda →</a>')+
@@ -152,7 +152,7 @@ function listPage(name) {
  const content=isEquipment
    ?entries.length
      ?panelHeading('Equipos registrados',entries.length+' de '+project.equipment.length+' equipos')+cards(entries)
-     :'<p class="empty panel">Sin equipos para este filtro.</p>'
+     :'<p class="empty panel">'+(project.equipment.length?'Sin equipos para este filtro.':'El registro está vacío. Puedes crear un equipo o importar un caso.')+'</p>'
    :'<section class="panel">'+panelHeading('Programación de inspecciones',rows.length+' '+(rows.length===1?'punto de monitoreo':'puntos de monitoreo'))+
      (rows.length?schedule(rows):'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>')+'</section>';
  const interventions=isEquipment?'':wallPortfolio(allRows().filter(({e,p,r})=>

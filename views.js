@@ -8,7 +8,7 @@ function detail() {
  const header='<a class="back" href="#equipos">Registro de equipos</a>'+
    hero(equipment.tag+' / '+family[equipment.family],equipment.name,
      [equipment.plant,equipment.area,equipment.system].join(' · '),
-     action('Editar equipo','edit')+action('＋ Medición','measure',true))+
+     action('Eliminar equipo','deleteAsset')+action('Editar equipo','edit')+action('＋ Medición','measure',true))+
    equipmentMeta(equipment)+
    '<div class="tabs" aria-label="Vistas del equipo">'+Object.entries(equipmentTabs).map(([key,title])=>
      '<button type="button" data-tab="'+key+'" class="'+(tab===key?'active':'')+'" aria-current="'+
