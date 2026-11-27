@@ -38,15 +38,20 @@ function pointForm(i,j){
  field('id','Identificador TML',p.id)+field('cml','Identificador CML',p.cml||'')+field('name','Componente y orientación',p.name)+
  field('minimum_mm','Mínimo documentado (mm)',p.minimum_mm,'number','required min="0.001"')+field('alert_mm','Alerta (mm)',p.alert_mm,'number','required min="0.001"')+
  (e.family==='pipe'?select('geometry','Geometría del punto',[['supported','Tramo recto'],['accessory','Accesorio / codo']],p.geometry||(/codo/i.test(p.name)?'accessory':'supported')):'')+
- field('basis','Fuente del mínimo y criterio de alerta',p.basis||'Expediente académico del caso')+(e.family==='tank'?field('elevation_m','Cota inferior de la virola (m)',p.elevation_m,'number','required min="0"'):'')+
+ '<label class="wide">Fuente del mínimo y criterio de alerta<textarea name="basis" rows="4" required>'+esc(pointBasis(e,p)||'')+'</textarea></label>'+(e.family==='tank'?field('elevation_m','Cota inferior de la virola (m)',p.elevation_m,'number','required min="0"'):'')+
  '<small class="wide">Para medir en otra ubicación física, crea un TML nuevo y conserva este historial.</small>',f=>{
  const location=readLocation();
  if(location)p.location3d=location;else delete p.location3d;
  for(const k of ['name','id','cml','basis'])p[k]=f.get(k).trim();for(const k of ['x','y','minimum_mm','alert_mm','elevation_m'])if(f.has(k))p[k]=Number(f.get(k));
  if(f.has('geometry'))p.geometry=f.get('geometry');
+ if(!p.basis) throw Error('Indica la fuente del mínimo y cómo se eligió la alerta.');
+ if(!isNew && (p.minimum_mm!==e.points[j].minimum_mm || p.alert_mm!==e.points[j].alert_mm) &&
+    p.basis===pointBasis(e,e.points[j]) && p.basis.startsWith('Caso ficticio ·')) {
+   throw Error('Actualiza el fundamento para que explique los nuevos umbrales.');
+ }
  if(p.alert_mm<=p.minimum_mm)throw Error('La alerta debe superar el mínimo documentado.');
  commit(pr=>{const pts=pr.equipment[i].points;if(isNew)pts.push(p);else {
-   auditThresholds(pts[j],p.minimum_mm,p.alert_mm,p.basis);
+   auditThresholds(pts[j],p.minimum_mm,p.alert_mm,p.basis,pointBasis(e,pts[j]));
    pts[j]={...p,thresholdHistory:pts[j].thresholdHistory};
  }});
  if(isNew) navigate(equipmentScreen(e,p));
@@ -63,6 +68,7 @@ function imageForm(index){
 }
 function handleAction(act){
  const [e,,i]=current();
+ if(act==='filteredPoints')return navigate('#agenda',{filters:{filter,familyFilter,statusFilter}});
  if(act==='export')return projectBackup();
  if(act==='csv')return csvExport();
  if(act==='reset'){dialog('Recuperar demostración','<p class="wide">Se reemplazará el contenido guardado por el caso académico original. Exporta una copia desde el registro si necesitas conservar tus cambios.</p>',()=>{commit(p=>Object.assign(p,structuredClone(initialCase)));notify('Caso original recuperado')},'Recuperar');return}
@@ -130,12 +136,12 @@ window.addEventListener('resize',()=>{if(project)drawTrend()});
 async function start(){
  try{
  py=await loadPyodide({indexURL:new URL('runtime/',document.baseURI).href});
- for(const name of ['engineering','rbi','data_import']){const res=await fetch('./'+name+'.py?v='+(name==='engineering'?6:4));if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
- py.runPython('from engineering import shutdown_forecast as _shutdown, compare_reading as _compare_reading');
+ for(const name of ['engineering','rbi','data_import','reference_cases']){const res=await fetch('./'+name+'.py?v='+(name==='engineering'?7:4));if(!res.ok)throw Error('No se pudo cargar '+name);py.FS.writeFile('/home/pyodide/'+name+'.py',await res.text())}
+ py.runPython('from reference_cases import reference_cases\nfrom engineering import shutdown_forecast as _shutdown, compare_reading as _compare_reading');
  py.runPython('import json\nfrom engineering import demo_equipment, evaluate, wall_scenarios\nfrom rbi import rbi as _risk, DEFAULTS\nfrom data_import import read_measurements_csv as _read_csv, read_sqlite_catalog as _read_sqlite_catalog, read_sqlite_table as _read_sqlite_table\ndef _evaluate(obj): return evaluate(obj, _today)\ndef _simulate(obj): return evaluate(obj[\'equipment\'], max(_today, obj[\'date\']))\ndef _wall_scenarios(obj): return wall_scenarios(obj["point"], obj["lower"], obj["higher"])');
  py.globals.set('_today',today());template=JSON.parse(py.runPython('json.dumps(demo_equipment())'));
  const coords={pipe:[[27.5,48.6],[36.9,49.3],[74.6,44.2]],vessel:[[27.1,43.1],[44.5,51.3],[62.1,51.5]],tank:[[41,75.2],[45.6,59.2],[50.5,40.9]]};
- template.forEach(e=>e.points.forEach((p,i)=>{[p.x,p.y]=coords[e.family][i];p.cml='CML-0'+(i+1);p.basis='Mínimo del expediente académico; alerta con margen de '+fmt(p.alert_mm-p.minimum_mm)+' mm para intervención.'}));
+ template.forEach(e=>e.points.forEach((p,i)=>{[p.x,p.y]=coords[e.family][i];p.cml='CML-0'+(i+1);p.basis=demoThresholdBasis(e,p)}));
  const defaultCase={version:1,equipment:structuredClone(template),rbi:{...JSON.parse(py.runPython('json.dumps(DEFAULTS)')),costBasis:defaultCostBasis}};
  defaultCase.comparisons=[];initialCase=structuredClone(defaultCase);project=defaultCase;analysis=evaluateAll(project);const raw=localStorage.getItem(key);storedCase=raw;
  if(raw){try{const temp=JSON.parse(raw);analysis=evaluateAll(temp);project=temp;$('saved').textContent='Caso recuperado'}catch{notify('Respaldo local incompatible. Se muestra el caso de demostración.')}}

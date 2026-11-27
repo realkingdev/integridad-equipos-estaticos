@@ -57,7 +57,7 @@ function wallScale(s) {
 function pointCondition(equipment,point,s) {
  const label=[point.cml,point.id].filter(Boolean).join(' / ');
  const warnings=s.warnings||[];
- const trace=[s.governing,point.basis,...warnings].filter(Boolean).map(line=>'<p>'+esc(line)+'</p>').join('');
+ const trace=[s.governing,pointBasis(equipment,point),...warnings].filter(Boolean).map(line=>'<p>'+esc(line)+'</p>').join('');
  return '<section class="panel condition-panel"><div class="row"><span class="eyebrow">'+esc(label)+'</span>'+badge(s.status)+'</div>'+
    '<h2 class="condition-title">'+esc(point.name)+'</h2>'+
    '<div class="point-readout"><div><small>Espesor medido</small><strong>'+fmt(s.current_mm)+' <span class="unit">mm</span></strong>'+

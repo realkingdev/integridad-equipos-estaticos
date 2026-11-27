@@ -146,7 +146,7 @@ function listPage(name) {
  const filters=`<div class="filters">
   <label class="filter-field"><span>Equipo, punto o ubicación</span><input id="filter" aria-label="Buscar por equipo, punto o ubicación" placeholder="Ej. codo, virola o TML-02" value="${esc(filter)}"></label>
   <label class="filter-field"><span>Familia</span><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select></label>
-  <label class="filter-field"><span>Condición</span><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select></label>
+  <label class="filter-field"><span>${isEquipment?"Condición global del equipo":"Condición del punto"}</span><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select></label>
   ${isEquipment?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'+scheduleWindowInput()}
  </div>`;
  const content=isEquipment
@@ -157,5 +157,7 @@ function listPage(name) {
      (rows.length?schedule(rows):'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>')+'</section>';
  const interventions=isEquipment?'':wallPortfolio(allRows().filter(({e,p,r})=>
    matchesAsset(e,p)&&matchesCondition(r,statusFilter)&&(!scheduleTag||e.tag===scheduleTag)));
- return heading+filters+interventions+content;
+ const count=isEquipment && statusFilter ? allRows().filter(({e,p,r})=>matchesAsset(e,p)&&matchesCondition(r,statusFilter)).length : 0;
+ const pointLink=isEquipment && statusFilter ? '<p class="note">La condición global resume el estado más crítico del equipo. '+(count?action('Ver puntos con este filtro ('+count+')','filteredPoints'):'Ningún punto coincide con estos filtros.')+'</p>' : '';
+ return heading+filters+pointLink+interventions+content;
 }

@@ -1,3 +1,17 @@
+function demoThresholdBasis(e,p) {
+  const origin='Caso ficticio · '+e.tag+' / '+p.id+'. Se especifica un mínimo de servicio de '+fmt(p.minimum_mm)+' mm para este punto.';
+  if(e.tag==='L-101' && p.id==='TML-02') return origin+
+    ' El codo usa este límite como dato de entrada. Para la alerta se adopta una reserva de un ciclo de planificación de 5 años, entre la campaña de 2026 y la parada supuesta de 2031. La tasa base de 0,30 mm/año proviene de (6,00 − 4,80) / 4 entre 2022 y 2026. Alerta = 3,00 + 0,30 × 5 = 4,50 mm. Las nuevas UT actualizan la proyección; el umbral se revisa por separado.';
+  return origin+' La alerta de '+fmt(p.alert_mm)+' mm es un umbral fijo de planificación del caso. Reserva respecto del mínimo documentado: '+fmt(p.alert_mm-p.minimum_mm)+' mm.';
+}
+
+function pointBasis(e,p) {
+  const legacy='Mínimo del expediente académico; alerta con margen de '+fmt(p.alert_mm-p.minimum_mm)+' mm para intervención.';
+  if(p.basis!==legacy || p.thresholdHistory?.length) return p.basis;
+  const seed=template.find(asset=>asset.tag===e.tag && asset.family===e.family)?.points.find(point=>point.id===p.id);
+  return seed && seed.minimum_mm===p.minimum_mm && seed.alert_mm===p.alert_mm ? seed.basis : p.basis;
+}
+
 function evidenceValue(n,unit,digits=4) {
   return Number.isFinite(n)?fmt(n,digits)+(unit?' '+unit:''):'Sin cálculo';
 }
@@ -17,11 +31,11 @@ function readingEvidence(reading, normalized, hypothetical) {
     ' · '+(reading.technique||'Técnica sin especificar')+' · '+origin;
 }
 
-function auditThresholds(point, minimum, alert, basis) {
-  if (point.minimum_mm!==minimum||point.alert_mm!==alert) {
+function auditThresholds(point, minimum, alert, basis, previousBasis=point.basis) {
+  if (point.minimum_mm!==minimum||point.alert_mm!==alert || previousBasis!==basis) {
     const history=Array.isArray(point.thresholdHistory)?point.thresholdHistory:[];
     point.thresholdHistory=[...history,{date:today(),minimum:point.minimum_mm,alert:point.alert_mm,
-      nextMinimum:minimum,nextAlert:alert,basis}];
+      nextMinimum:minimum,nextAlert:alert,previousBasis,basis}];
   }
   point.minimum_mm=minimum;
   point.alert_mm=alert;
@@ -34,7 +48,7 @@ function thresholdHistory(p) {
   return '<details class="evidence"><summary>Historial de umbrales</summary><div class="scroll"><table><thead>'+
     '<tr><th>Fecha</th><th>Mínimo anterior y nuevo</th><th>Alerta anterior y nueva</th><th>Motivo y fuente</th></tr></thead><tbody>'+
     entries.map(i=>'<tr><td>'+esc(dateLabel(i.date))+'</td><td>'+esc(evidenceValue(i.minimum,'mm',3)+' → '+evidenceValue(i.nextMinimum,'mm',3))+
-      '</td><td>'+esc(evidenceValue(i.alert,'mm',3)+' → '+evidenceValue(i.nextAlert,'mm',3))+'</td><td>'+esc(i.basis)+'</td></tr>').join('')+
+      '</td><td>'+esc(evidenceValue(i.alert,'mm',3)+' → '+evidenceValue(i.nextAlert,'mm',3))+'</td><td>'+(i.previousBasis?'<small>Anterior · '+esc(i.previousBasis)+'</small><br>':'')+esc(i.basis)+'</td></tr>').join('')+
     '</tbody></table></div></details>';
 }
 
@@ -49,6 +63,9 @@ function pointEvidence(e,p,s,hypothetical=false) {
     ['Mínimo efectivo',evidenceValue(s.minimum_mm,'mm')],
     ['Espesor de alerta',evidenceValue(s.alert_mm,'mm')]
   ];
+  const reserve=s.alert_mm-s.minimum_mm;
+  rows.push(['Margen de alerta sobre el mínimo efectivo',evidenceValue(reserve,'mm')]);
+  if(reserve>0 && s.rate>0) rows.push(['Tiempo entre alerta y mínimo a la tasa actual',evidenceValue(reserve/s.rate,'años')]);
   const revision=Array.isArray(measured?.revisions)?measured.revisions.at(-1):null;
   if (revision?.previous) {
     const old=revision.previous;
@@ -68,7 +85,7 @@ function pointEvidence(e,p,s,hypothetical=false) {
     evidenceValue(s.half_life_years,'años')+' · Tope '+evidenceValue(s.cap_years,'años')+' · Hasta alerta '+evidenceValue(s.alert_years,'años')]);
   return evidenceSection('Cómo se obtuvo la evaluación',rows,
     'Tasa = (espesor anterior − espesor actual) / Δt. Vida remanente = (espesor actual − mínimo efectivo) / tasa. El menor intervalo aplicable gobierna la fecha.',
-    s.inspection_type+' · '+s.reference,[p.basis,s.rate_basis,...s.warnings])+thresholdHistory(p);
+    s.inspection_type+' · '+s.reference,[pointBasis(e,p),s.rate_basis,...s.warnings])+thresholdHistory(p);
 }
 
 function designEvidence(e,p,s) {

@@ -7,7 +7,7 @@ PSI = 0.006894757293168
 MATERIAL = {"pipe": "ASTM A106 Gr B", "vessel": "SA-285 Gr B", "tank": "ASTM A283M Gr C"}
 STATUS = ["Normal", "Inspección vencida", "Información insuficiente", "Alerta", "Bajo mínimo"]
 INSPECTION = {
-    "pipe": ("UT de circuito Clase 1", "API 570, §6.3.3 según clase 05 y Certamen 2. Criterio académico sin RBI.", 5),
+    "pipe": ("UT de circuito Clase 1", "API 570, 4.ª edición (2016), §6.3.3 y tabla 2. Circuito clase 1 supuesto, sin RBI. El modelo adopta el menor plazo entre media vida, 5 años y llegada a la alerta.", 5),
     "vessel": ("Seguimiento UT del manto", "API 510, 11.ª ed., §6.5. Se adopta para UT el límite académico de la inspección interna/en servicio. La UT puntual no sustituye esa inspección.", 10),
     "tank": ("UT externa de virolas", "API 653, 5.ª ed., §6.3.3.2. Tasa conocida: mitad de vida o 15 años. Fondo, techo, cimentación e inspección interna requieren evaluaciones propias.", 15),
 }
