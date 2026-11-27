@@ -39,6 +39,7 @@ function renderShutdown() {
     '<label class="filter-field"><span>Equipo</span><select id="shutdown-filter">' +
     opts([['','Todos los equipos'], ...project.equipment.map(e => [e.tag, e.tag + ' · ' + e.name])], view.filter) +
     '</select></label><p id="shutdown-error" role="alert" hidden></p></div>' +
+    guideTip('shutdown','La fecha de parada sirve para comparar escenarios. La próxima inspección programada está en la ficha del punto.')+
     '<div id="shutdown-summary" aria-live="polite" aria-atomic="true"></div>' +
     '<div id="shutdown-model" tabindex="-1"></div>' +
     '<section class="panel shutdown-results">' +

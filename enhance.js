@@ -1,15 +1,20 @@
 function visibleSchedule() {
-  return allRows().filter(({e,r}) => matchesAsset(e) && matchesCondition(r,statusFilter) && matchesWindow(r,scheduleDays) && (!scheduleTag || e.tag===scheduleTag));
+  return allRows().filter(({e,p,r}) => matchesAsset(e,p) && matchesCondition(r,statusFilter) && matchesWindow(r,scheduleDays) && (!scheduleTag || e.tag===scheduleTag));
 }
 
 function matchesCondition(result,state) {
   return !state || (state === 'Inspección vencida' ? result.overdue : result.status === state);
 }
 
-function matchesAsset(e) {
-  const normalize = text => String(text ?? '').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
-  return (!familyFilter || e.family === familyFilter) &&
-    normalize([e.tag,e.name,e.plant,e.area,e.system,e.circuit].join(' ')).includes(normalize(filter.trim()));
+function matchesAsset(e,point) {
+  if(familyFilter && e.family!==familyFilter) return false;
+  const words=chatNormalize(filter).split(' ').filter(Boolean);
+  if(!words.length) return true;
+  const asset=[e.tag,e.name,e.plant,e.area,e.system,e.circuit].join(' ');
+  return (point?[point]:e.points).some(p=>{
+    const location=chatNormalize([asset,p.id,p.cml,p.name].join(' '));
+    return words.every(word=>/^\d+$/.test(word)?containsPhrase(location,word):location.includes(word));
+  });
 }
 
 function statusSummary(rows) {

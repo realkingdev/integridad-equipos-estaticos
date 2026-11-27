@@ -11,6 +11,7 @@ function pointLocationFields(equipment, point) {
     '<div class="point-view-switch" role="group" aria-label="Vista de ubicación">' +
     '<button type="button" data-location-view="3d" aria-pressed="true">Modelo 3D</button>' +
     '<button type="button" data-location-view="2d" aria-pressed="false">Esquema 2D</button></div></div>' +
+    guideTip('zero','Para volver a medir en el mismo lugar, elige una soldadura o una marca reconocible como inicio de los ángulos.')+
     '<div class="point-location-layout" data-location-pane="3d"><div class="point-viewer">' +
     '<canvas class="point-surface" tabindex="0" aria-label="Superficie 3D. Usa las flechas para girar y más o menos para acercar o alejar."></canvas>' +
     '<div class="row point-view-tools">' +

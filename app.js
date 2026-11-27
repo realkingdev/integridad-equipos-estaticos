@@ -122,7 +122,7 @@ function overview() {
    <small>${label}</small><b>${count}</b></div>`).join('');
  const headline=hero('CONTROL DE INTEGRIDAD','Vista general',
    'Estado de los equipos, mediciones y próximas inspecciones.',
-   '<a href="#parada" class="button-link">Simular parada</a>'+action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
+   '<a href="#asistente" class="button-link">Consultar al asistente</a><a href="#parada" class="button-link">Simular parada</a>'+action('Exportar caso','export')+action('＋ Registrar medición','measureAny',true));
  return '<div class="dashboard-intro">'+headline+'</div><div class="kpis">'+metrics+'</div>'+
    '<div class="overview-workspace"><section class="panel">'+
    panelHeading('Agenda de inspección','Evaluación al '+dateLabel(assessmentDate||today()),'<a href="#agenda" class="link">Ver agenda →</a>')+
@@ -144,7 +144,7 @@ function listPage(name) {
  const heading=hero(isEquipment?'GESTIÓN DE ACTIVOS':'PLANIFICACIÓN',navNames[name],
    isEquipment?'Antecedentes, esquemas y mediciones por equipo.':'Fechas y criterios de inspección por punto de monitoreo.',actions);
  const filters=`<div class="filters">
-  <label class="filter-field"><span>TAG o ubicación</span><input id="filter" aria-label="Buscar por TAG o ubicación" placeholder="Ej. L-101" value="${esc(filter)}"></label>
+  <label class="filter-field"><span>Equipo, punto o ubicación</span><input id="filter" aria-label="Buscar por equipo, punto o ubicación" placeholder="Ej. codo, virola o TML-02" value="${esc(filter)}"></label>
   <label class="filter-field"><span>Familia</span><select id="familyFilter" aria-label="Familia">${opts([['','Todas las familias'],...Object.entries(family)],familyFilter)}</select></label>
   <label class="filter-field"><span>Condición</span><select id="statusFilter" aria-label="Condición">${opts([['','Todas las condiciones'],...states.map(s=>[s,s])],statusFilter)}</select></label>
   ${isEquipment?'':'<label class="assessment">Evaluar a la fecha <input id="assessment" type="date" min="'+today()+'" value="'+(assessmentDate||today())+'"></label>'+scheduleWindowInput()}
@@ -155,7 +155,7 @@ function listPage(name) {
      :'<p class="empty panel">Sin equipos para este filtro.</p>'
    :'<section class="panel">'+panelHeading('Programación de inspecciones',rows.length+' '+(rows.length===1?'punto de monitoreo':'puntos de monitoreo'))+
      (rows.length?schedule(rows):'<p class="empty">'+(scheduleDays?'Sin inspecciones programadas en este plazo.':'Sin puntos para este filtro.')+'</p>')+'</section>';
- const interventions=isEquipment?'':wallPortfolio(allRows().filter(({e,r})=>
-   matchesAsset(e)&&matchesCondition(r,statusFilter)&&(!scheduleTag||e.tag===scheduleTag)));
+ const interventions=isEquipment?'':wallPortfolio(allRows().filter(({e,p,r})=>
+   matchesAsset(e,p)&&matchesCondition(r,statusFilter)&&(!scheduleTag||e.tag===scheduleTag)));
  return heading+filters+interventions+content;
 }

@@ -13,6 +13,7 @@ function measure(equipmentIndex, locationIndex, originalDate) {
   const options = [['same','Serie correspondiente a la fecha'], ['restart','Iniciar serie por intervención']];
   dialog(editing ? 'Corregir medición' : 'Registrar medición',
     '<p class="wide muted">' + esc(equipment.tag + ' · ' + point.id + ' · ' + point.name) + '</p>' +
+    (editing ? '' : guideTip('measurement','Comprueba la unidad del instrumento. Si cambió la pared por una reparación o un reemplazo, inicia una serie en Comparabilidad.')) +
     field('date','Fecha de medición',original?.date || today(),'date','required max="' + today() + '"') +
     field('thickness','Espesor medido',original?.thickness ?? '','number','required min="0"') +
     select('unit','Unidad',[['mm','Milímetros'],['in','Pulgadas']],original?.unit || 'mm') +

@@ -156,3 +156,28 @@
   .live-metric {padding:8px;}
   .chat-panel > .chat-header {padding:11px 12px;}
 }
+
+.guide-scope {display:flex;gap:14px;align-items:center;padding:14px 18px 0;}
+.guide-scope label,.guide-choice label {font-weight:600;font-size:13px;}
+.guide-scope select {max-width:100%;min-width:0;}
+.guide-tasks {display:flex;flex-wrap:wrap;gap:7px;padding:12px 18px;border-bottom:1px solid var(--line);}
+.guide-tasks button,.guide-command {color:var(--accent);font-weight:620;}
+.guide-choice {display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:10px;}
+.guide-choice label {display:grid;gap:4px;min-width:0;max-width:100%;}
+.guide-choice select {width:100%;min-width:0;}
+.guide-command {margin-top:8px;}
+.guide-faq details {border-top:1px solid var(--line);padding:12px 0;}
+.guide-faq details p {max-width:78ch;margin:8px 0;color:var(--muted);}
+.guide-faq summary {font-weight:600;cursor:pointer;}
+.guide-faq .row {flex-wrap:wrap;margin-bottom:12px;}
+.tip-setting {display:inline-flex;gap:7px;align-items:center;font-size:13px;}
+.tip-setting input {width:16px;height:16px;min-height:0;accent-color:var(--accent);}
+.guide-tip {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-left:3px solid var(--accent);background:var(--surface-soft);font-size:13px;margin:8px 0;}
+.guide-tip span {flex:1 1 200px;}
+.chat-panel .chat-bubble {min-width:0;}
+@media(max-width:600px) {
+  .guide-scope {display:grid;gap:5px;padding:12px 13px 0;}
+  .guide-tasks {padding:10px 13px;}
+  .guide-tasks button {flex:1 1 110px;}
+  .guide-choice {display:grid;}
+}

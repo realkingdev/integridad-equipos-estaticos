@@ -1,7 +1,7 @@
 const chatMessages=[];
 let chatDraft='', chatFocus;
 const examples=[
-  '¿Cuándo se inspecciona el codo L-101?',
+  '¿Qué punto debería revisar primero?',
   '¿Qué puntos están bajo el mínimo?',
   '¿Cuál es el riesgo económico RBI?',
   '¿Qué inspecciones de tubería vencen en 90 días?',
@@ -17,21 +17,27 @@ const chatReading=(n,unit,d=2)=>Number.isFinite(n)?fmt(n,d)+' '+unit:'sin cálcu
 const chatDate=()=>dateLabel(assessmentDate||today());
 
 function renderAssistant() {
-  const turns=chatMessages.map(({role,body,links})=>
+  const turns=chatMessages.map((reply,index)=>{
+    const {role,body,links}=reply;
+    return (
     '<article class="chat-message '+role+'"><span class="chat-avatar" aria-hidden="true">'+(role==='user'?'T':'E')+'</span>'+
     '<div class="chat-bubble"><small>'+(role==='user'?'Tú':'Estrato')+'</small><p>'+esc(body)+'</p>'+
-    (links?.length?'<div class="chat-links">'+links.map(({label,href})=>'<a href="'+esc(href)+'">'+esc(label)+' ↗</a>').join('')+'</div>':'')+'</div></article>').join('');
+    (links?.length?'<div class="chat-links">'+links.map(({label,href})=>'<a href="'+esc(href)+'">'+esc(label)+' ↗</a>').join('')+'</div>':'')+guideControls(reply,index)+'</div></article>');
+  }).join('');
   return hero('CONSULTA DEL CASO','Asistente de Estrato','Encuentra datos de equipos, lecturas, próximas inspecciones y resultados RBI.')+
     '<section class="panel chat-panel"><div class="row chat-header"><div><h2>Consulta tus registros</h2>'+
     '<p class="muted">Caso guardado · Evaluado al '+chatDate()+'</p></div>'+
     '<button type="button" data-chat-clear '+(chatMessages.length?'':'disabled')+'>Limpiar conversación</button></div>'+
-    '<div class="chat-stream" id="chat-stream" tabindex="0" aria-label="Conversación">'+
+    guideSelector()+'<div class="guide-tasks" aria-label="Consultas rápidas">'+
+    [['measure','Registrar una medición'],['due','Explicar la inspección'],['zero','Marcar el cero en 3D'],['shutdown','Simular una parada']].map(([key,label])=>
+      '<button type="button" data-chat-question="'+esc(guideTopics[key].question)+'">'+label+'</button>').join('')+'</div>'+
+    '<div class="chat-stream" id="chat-stream" tabindex="0" aria-label="Conversación" role="log">'+
     (turns||'<div class="chat-empty"><h3>¿Qué necesitas encontrar?</h3><div class="chat-examples">'+
       examples.map(q=>'<button type="button" data-chat-question="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div></div>')+'</div>'+
     '<form id="chat-form" class="chat-form"><label class="sr-only" for="chat-question">Pregunta sobre el caso</label>'+
     '<input id="chat-question" name="question" value="'+esc(chatDraft)+'" maxlength="350" placeholder="Ej. ¿Cuánto espesor tiene TML-02 de L-101?" required>'+
     '<button class="primary" type="submit">Enviar ↑</button></form>'+
-    '<small class="muted">Consulta local basada en los registros de Estrato y en las referencias del modelo.</small></section>';
+    '<small class="muted">Respuestas calculadas en este navegador con los datos del caso.</small></section>'+assistantFaq();
 }
 
 function chatPointAnswer(row, query) {
@@ -91,25 +97,39 @@ function chatHelp(query) {
 
 function answerCase(question) {
   const q=chatNormalize(question);
-  const help=chatHelp(q);
+  const topic=guideIntent(q);
+  const help=!topic && chatHelp(q);
   if (help) return help;
   const all=allRows();
-  const byAsset=project.equipment.filter(e=>containsPhrase(q,chatNormalize(e.tag))||
+  const byAsset=project.equipment.filter(e=>containsPhrase(q,chatNormalize(e.tag))||containsPhrase(q,chatNormalize(e.tag).replaceAll(' ',''))||
     (e.name&&containsPhrase(q,chatNormalize(e.name))));
   const assets=byAsset.length?byAsset:project.equipment.filter(e=>
     ({pipe:/tuberia|caneria|circuito/,tank:/tanque|estanque|virola/,vessel:/recipiente|separador/})[e.family].test(q));
   let rows=assets.length?all.filter(row=>assets.includes(row.e)):all;
+  const scope=currentGuideRow(all);
+  if (/\b(?:l|v|tk)\s*\d+\b/.test(q) && !byAsset.length) {
+    return {body:'Ese TAG no figura en el registro activo.',links:[chatLink('Ver equipos','#equipos')]};
+  }
   const matchTml=q.match(/\btml\s*0*(\d+)\b/);
-  const namedRows=rows.filter(({p})=>containsPhrase(q,chatNormalize(p.id))||
+  let namedRows=rows.filter(({p})=>containsPhrase(q,chatNormalize(p.id))||
     (matchTml && Number(chatNormalize(p.id).match(/\btml\s*0*(\d+)\b/)?.[1])===Number(matchTml[1]))||
     (p.name && containsPhrase(q,chatNormalize(p.name)))||
     (/codo/.test(q)&&/codo/i.test(p.name)));
+  if(scope&&!assets.length&&!matchTml&&!namedRows.length) { rows=[scope]; namedRows=rows; }
+  if(scope&&!assets.length&&namedRows.some(row=>row.e===scope.e&&row.p===scope.p)) namedRows=[scope];
   if (namedRows.length) rows=namedRows;
   else if (matchTml || /\b(?:[a-z]{1,4}\s)\d{2,}\b/.test(q)&&/\b(?:l|v|tk|tag)\s+\d+\b/.test(q)&&!byAsset.length) {
     return {body:'No encontré ese TAG o TML en el caso activo. Revisa el identificador en el registro de equipos.',
       links:[chatLink('Buscar el equipo','#equipos')]};
   }
 
+  if (topic) return rows.length===1?guideAnswer(topic,rows[0],question):guideChoose(topic,rows,question);
+  if (/prioridad|mas urgente|primero|mas critico/.test(q)&&!/riesgo|rbi/.test(q)) {
+    const ranked=rankedWallRows(rows).slice(0,3);
+    return {body:'Prioridad por espesor al '+chatDate()+'\n\n'+ranked.map(({e,p,action})=>
+      e.tag+' · '+p.id+' · '+action.label+'\n'+action.advice).join('\n\n'),
+      links:[...ranked.map(rowLink),chatLink('Ver plan de intervención','#agenda')]};
+  }
   if (/rbi|riesgo economico|riesgo de area|factor de dano|probabilidad de falla|frecuencia de falla/.test(q)) {
     const result=call('_risk',rbiValues());
     return {body:'Escenario RBI guardado\n\nPrioridad '+result.priority+
@@ -187,10 +207,17 @@ function answerCase(question) {
 function askChat(question) {
   const clean=question.trim();
   if (!clean) return;
-  const contextual=/\b(?:su|ese punto|esa lectura)\b/.test(chatNormalize(clean))&&chatFocus;
+  const q=chatNormalize(clean);
+  const followUp=/\b(?:su|ese punto|esa lectura|ese mismo)\b|^y (?:cuando|cuanto|por que|la tasa|la vida|su |el espesor|la fecha|si (?:mide|midiera))/.test(q);
+  const anotherPoint=/\b(?:tml|cml|codo|virola|tanque|recipiente|tuberia|separador|circuito)\b/.test(q) ||
+    project.equipment.some(e=>containsPhrase(q,chatNormalize(e.tag))||containsPhrase(q,chatNormalize(e.tag).replaceAll(' ','')));
+  const contextual=chatFocus && followUp && !anotherPoint && !currentGuideRow(allRows());
   const reply=answerCase(contextual?clean+' '+chatFocus:clean);
-  const location=reply.links?.length===1?reply.links[0].href.split('/'):null;
-  chatFocus=location?.[0]==='#equipo'&&location[2]&&location[2]!=='~'?
+  appendChat(clean,reply);
+}
+function appendChat(clean,reply) {
+  const location=reply.links?.find(l=>l.href.startsWith('#equipo/'))?.href.split('/');
+  chatFocus=!reply.choices&&reply.links?.filter(l=>l.href.startsWith('#equipo/')).length===1&&location?.[0]==='#equipo'&&location[2]&&location[2]!=='~'?
     decodeURIComponent(location[1])+' '+decodeURIComponent(location[2]):null;
   chatMessages.push({role:'user',body:clean},{role:'assistant',...reply});
   if(chatMessages.length>80) chatMessages.splice(0,2);
@@ -208,7 +235,12 @@ document.addEventListener('submit',event=>{
 document.addEventListener('input',event=>{if(event.target.id==='chat-question')chatDraft=event.target.value});
 document.addEventListener('click',event=>{
   const example=event.target.closest('[data-chat-question]');
-  if (example) return askChat(example.dataset.chatQuestion);
+  if (example) {
+    const fromFaq=Boolean(example.closest('.guide-faq'));
+    askChat(example.dataset.chatQuestion);
+    if(fromFaq) $('chat-form').scrollIntoView({block:'nearest'});
+    return;
+  }
   if (!event.target.closest('[data-chat-clear]')) return;
   chatMessages.length=0;
   chatFocus=null;

@@ -70,7 +70,7 @@ function pointCondition(equipment,point,s) {
      '><summary>Criterio y observaciones</summary><div class="note">'+trace+'</div></details>':'')+
    '<div class="buttons monitor-actions"><button type="button" data-tab="simular" class="primary">Simular lectura</button>'+
    '<a class="button-link" href="#parada/'+esc(encodeURIComponent(equipment.tag))+'/'+esc(encodeURIComponent(point.id))+'">Simular parada en 3D</a>'+
-   action('Editar punto','editpoint')+'</div></section>';
+   action('Editar punto','editpoint')+'<a class="button-link" href="'+esc(guideUrl(equipment,point))+'">Consultar este punto</a></div></section>';
 }
 
 function thicknessChart(point,state) {
