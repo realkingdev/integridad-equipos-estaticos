@@ -12,7 +12,8 @@ function wallDate(crossing) {
 }
 
 function wallDateCell(crossing) {
-  return '<strong class="table-number">' + wallDate(crossing) + '</strong>' +
+  return (crossing.date ? '<strong class="table-number">' + wallDate(crossing) + '</strong>'
+    : '<span class="missing-wall-date">' + wallDate(crossing) + '</span>') +
     (crossing.kind === 'measured' ? '<small>Medido</small>' : '');
 }
 
@@ -61,12 +62,14 @@ function wallPortfolio(rows, compact = false) {
   const body = (compact ? ranked.slice(0, 3) : ranked).map(({e,p,action,limits}) =>
     '<tr><td class="asset-cell"><a href="' + esc(equipmentScreen(e,p)) + '" class="table-number">' +
     esc(e.tag) + ' · ' + esc(p.id) + '</a><small>' + esc(p.name) + '</small></td>' +
-    '<td>' + wallDateCell(limits.alert) + '</td><td>' + wallDateCell(limits.minimum) + '</td>' +
+    '<td class="wall-alert-column">' + wallDateCell(limits.alert) + '</td><td>' + wallDateCell(limits.minimum) +
+    '<small class="wall-mobile-alert">Alerta ' + wallDate(limits.alert) +
+    (limits.alert.kind === 'measured' ? ' (medida)' : '') + '</small></td>' +
     '<td><span class="pill ' + action.tone + '">' + action.label + '</span></td></tr>').join('');
   return '<section class="panel wall-portfolio">' + panelHeading(title, 'Fechas según la tasa adoptada. “Medido” indica que la última lectura ya alcanzó el umbral.',
     compact ? '<a href="#agenda" class="link">Ver plan de intervención →</a>' : '') +
     '<div class="scroll table-frame"><table class="data-table wall-table"><thead><tr><th scope="col">Equipo / punto</th>' +
-    '<th scope="col">Alerta</th><th scope="col">Mínimo</th><th scope="col">Acción</th></tr></thead>' +
+    '<th scope="col" class="wall-alert-column">Alerta</th><th scope="col">Mínimo</th><th scope="col">Acción</th></tr></thead>' +
     '<tbody>' + body + '</tbody></table></div></section>';
 }
 

@@ -87,7 +87,7 @@ function thicknessChart(point,state) {
      '<span class="minimum"><i></i>Mínimo '+fmt(state.minimum_mm)+' mm</span></div>'
      : '<p class="empty">Registra mediciones para ver el historial de espesor.</p>') +
    '<div class="scroll table-frame"><table class="data-table wall-table wall-scenarios"><thead><tr><th scope="col">Escenario</th>' +
-   '<th scope="col">Tasa (mm/año)</th><th scope="col">Fecha de alerta</th><th scope="col">Fecha al mínimo</th></tr></thead>' +
+   '<th scope="col">Tasa <small class="wall-rate-unit">mm/año</small></th><th scope="col">Fecha de alerta</th><th scope="col">Fecha al mínimo</th></tr></thead>' +
    '<tbody data-wall-rows>'+wallScenarioRows(state.wall_scenarios)+'</tbody></table></div>'+
    (projections ? '<details class="wall-adjust"><summary>Ajustar escenarios</summary><p>Las tasas moderada y acelerada son hipótesis aplicadas a la tasa adoptada.</p>'+
      '<div class="row"><label>Tasa moderada (% de adoptada)<input type="number" inputmode="decimal" min="0.01" max="100" step="any" value="75" data-wall-factor="lower"></label>'+

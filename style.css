@@ -431,8 +431,11 @@ canvas { display: block; }
 .wall-table td > small { margin-top: 2px; font-size: 10px; }
 .wall-table td, .wall-table th { vertical-align: middle; }
 .wall-table .pill { white-space: normal; }
+.wall-table td > .wall-mobile-alert { display: none; }
+.missing-wall-date { font-size: 11px; color: var(--muted); }
 .pill.planned { background: #e8f0f8; color: #274d71; }
 .wall-scenarios th[scope="row"] { color: var(--ink); }
+.wall-rate-unit { font-size: .9em; font-weight: 580; color: var(--muted); }
 .wall-scenarios .wall-adopted > * { background: #edf3f9; }
 .wall-scenario-line {
   display: inline-block; width: 16px; margin-right: 6px; border-top: 2px dashed var(--scenario-color);
@@ -573,10 +576,16 @@ dialog:has(.point-location) form > .buttons {
   .wall-scenario-line { width: 9px; margin-right: 4px; }
   .wall-scenarios { table-layout: fixed; }
   .wall-scenarios thead th:first-child { width: 27%; }
-  .wall-scenarios thead th:nth-child(2) { width: 17%; }
+  .wall-scenarios thead th:nth-child(2) { width: 19%; }
   .wall-scenarios td, .wall-scenarios th { padding-inline: 4px; }
   .wall-scenarios .wall-scenario-line { display: block; margin: 0 0 4px; }
+  .wall-rate-unit { display: block; }
   .wall-portfolio .asset-cell a { white-space: normal; }
+  .wall-portfolio .wall-table { table-layout: fixed; }
+  .wall-portfolio .wall-table th:first-child { width: 36%; }
+  .wall-portfolio .wall-table th:nth-child(3) { width: 31%; }
+  .wall-portfolio .wall-alert-column { display: none; }
+  .wall-table td > .wall-mobile-alert { display: block; }
   .agenda-table td, .agenda-table th { padding: 6px; white-space: normal; }
   .agenda-table .col-asset { width: 40%; }
   .agenda-table .col-state { width: 32%; }
